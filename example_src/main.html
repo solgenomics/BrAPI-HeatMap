@@ -1,0 +1,311 @@
+<div class="well well-sm">
+    <div class="form-group form-group-sm" id="traitdiv" >
+        <label for="trait_list_dropdown" class="col-sm-2 control-label">Select:</label></br>
+        <div class="col-sm-12">
+            <div id="heatmap_traits_assayed_dropdown">
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="form-group form-group-sm" id="ctrldiv" style="diaplay:none">
+    <label for="check_list_dropdown" class="col-sm-2 control-label">View Check Plots:</label></br>
+    <div class="col-sm-12">
+        <div id="heatmap_trial_checks_dropdown">
+        </div>
+        <div class="col-sm-4" id="check_plot_link">
+        </div>
+    </div>
+    <br/>
+    
+</div>
+<div class="col-sm-10" id="view_ctrl_button" style="display:none";>
+  <a id="view_ctrl_button_link"><button class="btn btn-primary"  type="button" id="view_ctrl_id_button" value="delete_cords" >View Controls</button></a>
+</div>
+<p></br>
+
+
+<div class="well well-sm">
+
+<div class="d3legend" id="d3legend"> <p></br>  &nbsp;&nbsp; <ul class="legend">
+  <li><span class="d3block_even_number"></span> Even Block Numbers (e.g. 2,4,...)</li>
+  <li><span class="d3block_odd_number"></span> Odd Block Numbers (e.g. 1,3,...)</li>
+  <li><span class="d3checks"></span> Checks</li>
+  <li><span class="d3rep_odd_number"></span> Odd Rep Numbers (e.g. 1,3,...)</li>
+  <li><span class="d3rep_even_number"></span> Even Rep Numbers (e.g. 2,4,...)</li>
+  <li> <img src="/static/css/images/plot_images.png" alt="Camera" height="20" width="20"> Plot Has Image</li>
+  <a id="hm_replace_accessions_link"><button class="btn btn-success" type="button" id="hm_replace_accession_button" value="replace_accession" style="display:none;">Replace Accession</button></a>
+</div>
+
+<div id="container_heatmap" ></div>
+<div id="container_fm" ></div>
+<div id="trait_heatmap" >loading...</div>
+<div id="trial_no_phenoMSG" >Upload trial phenotypes to view trait assayed heatmap</div>
+<div class="container" id="trial_no_rowColMSG">
+    <div class="well">
+    <!--    <centre><div id="trial_no_rowColMSG2" ><b>Trial plots have no row and column number to display heatmap</b></div></centre> -->
+    </div>
+</div>
+<div id="chart"></div>
+<!--<div class="col-sm-10" id="d_button" style="display:none";>
+  <a id="delete_trait" class="btn btn-primary">Delete Selected Trait</a> &nbsp;
+</div> -->
+
+</div>
+
+<div id="delete_field_map_dialog_message" title="Physical Field Map Deletion" style="display:none;">
+   <p>
+       <span class="ui-icon ui-icon-circle-check" style="float: left; margin: 0 7px 50px 0;"></span>
+       The field coordinates were deleted successfully...
+   </p>
+</div>
+
+<div id="delete_field_map_dialog" title="Physical Field Map Deletion" style="display:none;">
+   <div id="trait_list_dc" name="trait_list">
+       <label id="trait_list_label_dc" for="trait_list_list_select" style="display: inline-block; width: 300px;">Please, confirm field map deletion... <br />
+
+       </label>
+
+   </div>
+</div>
+
+<div class="modal  fade" id="suppress_plot_pheno_dialog" name="suppress_plot_pheno_dialog" tabindex="-1" role="dialog" aria-labelledby="SuppressPlotPhenoDialog">
+    <div class="modal-dialog " role="document">
+        <div class="modal-content">
+            <div class="modal-header" style="text-align: center">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                <h4 class="modal-title" id="SuppressPlotPhenoDialog">Suppress Plot Phenotype Measurement </h4>
+            </div>
+            <div class="modal-body">
+                <div class="container-fluid">
+
+                    <form class="form-horizontal" role="form" method="post" enctype="multipart/form-data" encoding="multipart/form-data" id="suppress_plot_pheno_form" name="suppress_plot_pheno_form">
+                    
+                    <center>
+                    <p3> Suppressed measurement will be seen as an outlier and can be excluded during phenotype analysis and download.</p3>
+                    </center></br>
+                        <div class="form-group">
+                            <label class="col-sm-3 control-label">Plot Name:</label>
+                            <div class="col-sm-8" id="myplot_name">
+                                
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="col-sm-3 control-label">Phenotype Value: </label>
+                            <div class="col-sm-8" id="pheno_value">
+                            
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="col-sm-3 control-label">Phenotype ID: </label>
+                            <div class="col-sm-8" id="mypheno_id">
+                            
+                            </div>
+                        </div>
+                         
+                        <div class="form-group">
+                            <label class="col-sm-3 control-label">Trait ID: </label>
+                            <div class="col-sm-8" id="mytrait_id">
+                            
+                            </div>
+                        </div>
+
+                    </form>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="close_suppress_plot_pheno_dialog" type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" name="suppress_plot_pheno_dialog_submit" id="suppress_plot_pheno_dialog_submit">Suppress Phenotype</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal  fade" id="suppress_phenotype_dialog_success_message" name="suppress_phenotype_dialog_success_message" tabindex="-1" role="dialog" aria-labelledby="SuppressPhenoDialog">
+    <div class="modal-dialog " role="document">
+        <div class="modal-content">
+            <div class="modal-header" style="text-align: center">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                <h4 class="modal-title" id="SuppressPhenoDialog">Suppress Phenotype For Plot </h4>
+            </div>
+            <div class="modal-body">
+                <div class="container-fluid">
+
+                    <form class="form-horizontal" role="form" method="post" enctype="multipart/form-data" encoding="multipart/form-data" id="suppress_plotPheno_form" name="suppress_plotPheno_form">
+
+                    <p3> Phenotype was suppressed successfully...</p3>
+
+                    </form>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="close_suppress_plot_pheno_dialog" type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal  fade" id="delete_trait_dialog_confirm_message" name="delete_trait_dialog_confirm_message" tabindex="-1" role="dialog" aria-labelledby="DeleteAssayedTraitDialog">
+    <div class="modal-dialog " role="document">
+        <div class="modal-content">
+            <div class="modal-header" style="text-align: center">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                <h4 class="modal-title" id="DeleteAssayedTraitDialog"><b>Assayed Trait Deletion</b></h4>
+            </div>
+            <div class="modal-body">
+                <div class="container-fluid">
+
+                    <form class="form-horizontal" role="form" method="post" enctype="multipart/form-data" encoding="multipart/form-data" id="trait_deletion_form" name="trait_deletion_form">
+
+                    <p3><b>Please, confirm the deletion of selected trait...</b></p3> </br></br>
+                    <center><p2> ...trait is deleted permanently from the database...</p2></center>
+
+                    </form>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="close_delete_trait_dialog" type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" name="delete_selected_trait_dialog_submit" id="delete_selected_trait_dialog_submit">Delete Trait</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal  fade" id="delete_trait_dialog_success_message" name="delete_trait_dialog_success_message" tabindex="-1" role="dialog" aria-labelledby="TraitDeletionDialog">
+    <div class="modal-dialog " role="document">
+        <div class="modal-content">
+            <div class="modal-header" style="text-align: center">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                <h4 class="modal-title" id="TraitDeletionDialog"><b>Assayed Trait Deletion</b></h4>
+            </div>
+            <div class="modal-body">
+                <div class="container-fluid">
+
+                    <p3> Trait deletion was successfully...</p3>
+
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="close_trait_delete_dialog" type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="hm_replace_plot_accessions_dialog" name="hm_replace_plot_accessions_dialog" tabindex="-1" role="dialog" aria-labelledby="HmReplacePlotAccessionsDialog">
+    <div class="modal-dialog " role="document">
+        <div class="modal-content">
+            <div class="modal-header" style="text-align: center">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                <h4 class="modal-title" id="HmReplacePlotAccessionsDialog">Replace Plot Accession</h4>
+            </div>
+            <div class="modal-body">
+                <div class="container-fluid">
+
+                    <form class="form-horizontal" role="form" method="post" enctype="multipart/form-data" encoding="multipart/form-data" id="hm_replace_plot_accession_form" name="hm_replace_plot_accession_form">
+                      <div id="hm_edit_plot_information">
+                      </div>
+
+                      <div class="form-group">
+                        <label class="col-sm-3 control-label">Plot Name: </label>
+                        <div class="col-sm-9" id="hm_edit_plot_name">
+
+                        </div>
+                      </div>
+
+                      <div class="form-group">
+                        <label class="col-sm-3 control-label">Plot Number: </label>
+                        <div class="col-sm-9" id="hm_edit_plot_number">
+                        </div>
+                      </div>
+
+                      <div class="form-group">
+                        <label class="col-sm-3 control-label">Plot Database ID: </label>
+                        <div class="col-sm-9" id="hm_edit_plot_id">
+                        </div>
+                      </div>
+
+                      <div class="form-group">
+                        <label class="col-sm-3 control-label">Accession: </label>
+                        <div class="col-sm-9" id="hm_edit_plot_accession">
+                        </div>
+                      </div>
+
+                      
+                      <div class="form-group">
+                        <label class="col-sm-3 control-label">Enter New Accession: </label>
+                        <div class="col-sm-9" >
+                          <input class="form-control" id="hm_accession" name="hm_accession"></input>
+                        </div>
+                      </div>
+
+
+                    </form>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary " name="hm_view_plot_image_submit" id="hm_view_plot_image_submit">View Plot Images</button>
+                <button id="hm_close_replace_plot_accession_dialog" type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" name="hm_replace_plot_accession_submit" id="hm_replace_plot_accession_submit">Replace Plot Accession</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal  fade" id="hm_replace_accessions_dialog_message" name="hm_replace_accessions_dialog_message" tabindex="-1" role="dialog" aria-labelledby="HmDialog">
+    <div class="modal-dialog " role="document">
+        <div class="modal-content">
+            <div class="modal-header" style="text-align: center">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                <h4 class="modal-title" id="HmDialog"><b>Replace Plot Accessions</b></h4>
+            </div>
+            <div class="modal-body">
+                <div class="container-fluid">
+
+                    <p3> Plot accession was replaced successfully...</p3>
+
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="close_hmfieldma_dialog" type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<%perl>
+my $dbh = $stockref->{dbh};
+my $image_ids =  $stockref->{image_ids} || [] ;
+</%perl>
+
+<div class="modal  fade" id="view_plot_image_dialog" name="view_plot_image_dialog" tabindex="-1" role="dialog" aria-labelledby="ViewPlotImage">
+    <div class="modal-dialog " role="document">
+        <div class="modal-content">
+            <div class="modal-header" style="text-align: center">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                <h4 class="modal-title" id="ViewPlotImage">View Plot Images</h4>
+            </div>
+            <div class="modal-body">
+                <div class="container-fluid">
+
+                    <form class="form-horizontal" role="form" method="post" enctype="multipart/form-data" encoding="multipart/form-data" id="view_plot_image_form" name="view_plot_image_form">
+                    
+                    <div class="col-sm-9" id="plot_image_ids"></div>
+                    
+                    <div class="col-sm-9" id="show_plot_image_ids"></div>
+                    
+                    </form>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="view_plot_image_dialog" type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+
+            </div>
+        </div>
+    </div>
+</div>
