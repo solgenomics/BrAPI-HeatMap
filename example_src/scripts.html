@@ -3,7 +3,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.3.7/js/bootstrap.min.js"></script>
 <script src="https://cdn.datatables.net/1.10.16/js/jquery.dataTables.min.js" charset="utf-8"></script>
 <script src="BrAPI.js"></script>
-<script src="GraphicalFilter.js" charset="utf-8"></script>
+<script src="HeatMap.js" charset="utf-8"></script>
 <script type="text/javascript">
     $(document).ready(function() {
         var run = false;
@@ -11,6 +11,65 @@
             if (run) {
                 $("#filtered_results").DataTable().destroy();
                 $("#filtered_results").html("");
+                
+                
+                jQuery("#trait_heatmap").css("display", "none");
+                
+                field_map_view();
+                jQuery.ajax ( {
+                    url: '/brapi/v1/studies/'+trial_id+'/observationvariables',
+                    //url : '/ajax/breeders/trial/'+ <% $trial_id %> + '/traits_assayed?stock_type='+value,
+                    beforeSend: function() {
+                      jQuery("#working_modal").modal("show");
+                    },
+                    success: function(response){
+                        var data = response.result.data;
+                        var varName = [];
+                        var varID = [];
+                        jQuery.each(data, function(key_obj, value_obj) {
+                            jQuery.each(value_obj, function(key, value) {
+                                if (key == 'name'){
+                                    varName.push(value);
+                                }
+                                if (key == 'observationVariableDbId'){
+                                    varID.push(value);
+                                }
+                            });
+                        });
+
+                        if (varName != '' && varID != '' ) {
+                            var traits_assayed_html = "<select class='form-control' id='trait_list_dropdown'>";
+                            traits_assayed_html = traits_assayed_html + "<optgroup label='Field Map'>";
+                            traits_assayed_html = traits_assayed_html + "<option value='fieldmap'>view field layout</option></optgroup>";
+                            traits_assayed_html = traits_assayed_html + "<optgroup label='Assayed Traits'>";
+                            for (i=0; i<varID.length; i++) {
+                                traits_assayed_html = traits_assayed_html + "<option value="+ varID[i] + " >" + varName[i] + "</option>";
+                            }
+                            traits_assayed_html = traits_assayed_html +"</optgroup>";
+                            traits_assayed_html = traits_assayed_html +"</select>";
+                            jQuery("#trait_heatmap").css("display", "none");                   
+                            jQuery("#heatmap_traits_assayed_dropdown").html(traits_assayed_html);
+                            jQuery("#traitdiv").css("display", "inline-block");
+                        } 
+                        else {
+                            var traits_assayed_html = "<select class='form-control' id='trait_list_dropdown'>";
+                            traits_assayed_html = traits_assayed_html + "<optgroup label='Field Map'>";
+                            traits_assayed_html = traits_assayed_html + "<option value='fieldmap'>view field layout</option></optgroup>";
+                            traits_assayed_html = traits_assayed_html + "<optgroup label='Assayed Traits'>";
+                            traits_assayed_html = traits_assayed_html +"</optgroup>";
+                            traits_assayed_html = traits_assayed_html +"</select>";
+                            jQuery("#trait_heatmap").css("display", "none");                   
+                            jQuery("#heatmap_traits_assayed_dropdown").html(traits_assayed_html);
+                            jQuery("#traitdiv").css("display", "inline-block");               
+                        }
+                    },
+                    error: function(response){
+                        alert('Error retrieving traits assayed in this trial');
+                    }
+                }); 
+                
+                
+                
             }
             run = true;
             var form = $(this).serializeArray().reduce(function(vals, entry) {
@@ -31,7 +90,6 @@
             var brapi = BrAPI(base_url + "brapi/v1", auth);
             var params = {
                 "studyDbIds": [form.study],
-                "observationLevel": form.unit
             };
             GraphicalFilter(
                 brapi.phenotypes_search(params),
