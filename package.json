@@ -8,9 +8,6 @@
     "npm": "^6.4.0"
   },
   "devDependencies": {},
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
   "repository": {
     "type": "git",
     "url": "https://github.com/solgenomics/BrAPI-HeatMap.git"
@@ -19,16 +16,16 @@
   "license": "ISC",
   "bugs": {
     "url": "https://github.com/solgenomics/BrAPI-HeatMap/issues"
-},
-"scripts": {
-       "prepare": "mkdir -p docs && wrapbrapp"
-   },
-   "brapp": {
-       "out": "docs/example.html", // output directory for the output
-       "name": "Study Layout/Assayed Trait HeatMap", // Name of your BrApp
-       "link": "https://github.com/solgenomics/BrAPI-HeatMap", // link to BrApp source
-       "forward": "html/forward.html", // partial html file with html to appear before the BrApp wrapper
-       "main": "html/main.html", // partial html file with the main visual elements of your BrApp
-       "scripts": "html/scripts.html"  // partial html file with html to appear after the BrApp wrapper, this is where scripts should go.
-   }
+  },
+  "scripts": {
+    "prepare": "mkdir -p docs && wrapbrapp"
+  },
+  "brapp": {
+   "out": "docs/example.html",
+   "name": "Study Layout/Assayed Trait HeatMap",
+   "link": "https://github.com/solgenomics/BrAPI-HeatMap",
+   "forward": "example_src/forward.html",
+   "main": "example_src/main.html",
+   "scripts": "example_src/scripts.html" 
+  }
 }
