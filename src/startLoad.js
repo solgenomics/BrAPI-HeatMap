@@ -1,4 +1,4 @@
-import BrAPI from "@solgenomics/BrAPI-js";
+import BrAPI from "@solgenomics/brapijs";
 
 export default function(HeatMap){
   /**

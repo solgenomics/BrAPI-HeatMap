@@ -1,0 +1,30 @@
+@charset "UTF-8";
+
+.leaflet-container {
+    background-color:white;
+}
+
+.leaflet-zoom-anim .zoom-hide-transition{
+  opacity: 0.2;
+}
+.zoom-hide-transition{
+  opacity: 1;
+  transition: opacity 150ms;
+  transition: visibility 1s;
+}
+
+.HeatMap_layout.Heatmap_loading{
+  opacity: 0.5;
+}
+.HeatMap_obsUnit{
+  opacity: 0.7;
+}
+.HeatMap_obsUnit-focus{
+  opacity: 0.9;
+}
+.HeatMap_block-focus{
+  stroke-width:4px;
+}
+.HeatMap_rep-focus{
+  stroke-width:6px;
+}

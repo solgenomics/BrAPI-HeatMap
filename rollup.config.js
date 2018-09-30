@@ -8,7 +8,7 @@ export default {
     globals: {
       'd3':'d3',
       '@turf/turf':'turf',
-      '@solgenomics/BrAPI-js':'BrAPI',
+      '@solgenomics/brapijs':'BrAPI',
       'leaflet':'L',
     }
   }

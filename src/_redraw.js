@@ -1,7 +1,6 @@
 import d3 from "d3";
 import turf from "@turf/turf";
 import L from "leaflet";
-import "d3-svg-legend";
 
 export default function(HeatMap){
   
