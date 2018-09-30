@@ -4,10 +4,15 @@
   "description": "Tool for viewing physical observations study layout and assayed traits.",
   "main": "index.js",
   "dependencies": {
-    "@solgenomics/brapp-wrapper": "^1.1.0",
-    "npm": "^6.4.0"
+    "npm": "^6.4.0",
+    "rollup": "^0.66.2"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "@solgenomics/brapp-wrapper": "^1.1.0",
+    "@turf/turf": "^5.1.6",
+    "d3": "^5.7.0",
+    "leaflet": "^1.3.4"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/solgenomics/BrAPI-HeatMap.git"
@@ -18,14 +23,16 @@
     "url": "https://github.com/solgenomics/BrAPI-HeatMap/issues"
   },
   "scripts": {
-    "prepare": "mkdir -p docs && wrapbrapp"
+    "prepare": "mkdir -p dist && rollup -c && cp -f css/HeatMap.css dist/HeatMap.css",
+    "rollup-example": "",
+    "prepublishOnly": "npm run rollup-example && mkdir -p docs && wrapbrapp"
   },
   "brapp": {
-   "out": "docs/example.html",
-   "name": "Study Layout/Assayed Trait HeatMap",
-   "link": "https://github.com/solgenomics/BrAPI-HeatMap",
-   "forward": "example_src/forward.html",
-   "main": "example_src/main.html",
-   "scripts": "example_src/scripts.html" 
+    "out": "docs/example.html",
+    "name": "Study Layout/Assayed Trait HeatMap",
+    "link": "https://github.com/solgenomics/BrAPI-HeatMap",
+    "forward": "example_src/forward.html",
+    "main": "example_src/main.html",
+    "scripts": "example_src/scripts.html"
   }
 }
