@@ -91,7 +91,6 @@ export default function(HeatMap){
       .select("path")
       .attr("fill",(obs)=>{
         // HeatMap color!
-        console.log(this.controls._trait);
         if(this.controls._trait==undefined){
           // No selected trait!
           return "black"
@@ -111,7 +110,7 @@ export default function(HeatMap){
         return this.map.latLngToLayerPoint(new L.LatLng(c[1],c[0])).y
       })
       .attr("font-size",function(){
-        return this.parentNode.getBBox().width/5;
+        return (d3.select(this.parentNode).select("path").node().getBBox().width/5) || 0;
       });
   }
 
