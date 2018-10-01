@@ -50,15 +50,15 @@ export default class HeatMap {
 
     // Set up the Controls
     this.controls.div = this.controls.container.append("div").classed("HeatMap_controls",true);
-    this.controls.traits = this.controls.div.append("select").classed("HeatMap_trait_select",true);
-    this.controls.traits.on("change",()=>{
-      this.trait_set(this.controls.traits.node().value);
-    });
     this.controls.legend = this.controls.div.append("svg")
       .attr("width", "100%")
       .attr("height", 50)
       .append("g")
       .attr("transform", "translate(0,10)");
+    this.controls.traits = this.controls.div.append("select").classed("HeatMap_trait_select",true);
+    this.controls.traits.on("change",()=>{
+      this.trait_set(this.controls.traits.node().value);
+    });
 
     // Load Data
     this.layout_data = {};
