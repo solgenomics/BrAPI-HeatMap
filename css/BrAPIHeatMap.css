@@ -1,16 +1,16 @@
 @charset "UTF-8";
 
 .leaflet-container {
-    background-color:white;
+    background-color:#888;
 }
 
 .leaflet-zoom-anim .zoom-hide-transition{
-  opacity: 0.2;
+  opacity: 0;
+  transition: opacity 0s,visibility 0s;
 }
 .zoom-hide-transition{
   opacity: 1;
-  transition: opacity 150ms;
-  transition: visibility 1s;
+  transition: opacity 250ms,visibility 250s;
 }
 
 .HeatMap_layout.Heatmap_loading{

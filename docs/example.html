@@ -13,8 +13,16 @@
       BrAPI Study Layout/Assayed Trait HeatMap
     </h1>
     <div class="forward-container">
-      <link rel="stylesheet" property="stylesheet" href="/dist/BrAPIHeatMap.css">
       <link rel="stylesheet" href="leaflet.css">
+      <link rel="stylesheet" property="stylesheet" href="/dist/BrAPIHeatMap.css">
+      <form class="form-inline" action="#" style="padding:10px;">
+        <div class="form-group">
+          <label for="endpoint">BrAPI Base URL</label> <input type="text" class="form-control" name="endpoint" value="https://cassavabase.org/brapi/v1">
+        </div>
+        <div class="form-group">
+          <label for="studyDbId">Study ID</label> <input type="text" class="form-control" name="studyDbId" value="1953">
+        </div><button type="submit" id="build-heatmap-submit" class="btn btn-default">Build Heatmap</button>
+      </form>
     </div>
     <div class="brapp-container" style="position:relative;">
       <div value="brapp-wrapper" style="display:inline-block; border:solid 1px #ccc;border-radius:4px;">
@@ -35,17 +43,35 @@
 </script> <script src="BrAPI.js">
 </script> <script src="BrAPIHeatMap.js" charset="utf-8">
 </script> <script type="text/javascript">
-// 4015
-    // 3443
+// 4015 plots,positions
+    // 3443 plots,positions,smaller,duplicated
     // 1828
     // 1649
     // 2812
-    var myHeatMap = new BrAPIHeatMap("#map","#map_controls","1649");
-    L.tileLayer('http://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{
-        attribution: '&copy; <a href="http://www.esri.com/">Esri<\/a>, DigitalGlobe, GeoEye, i-cubed, USDA FSA, USGS, AEX, Getmapping, Aerogrid, IGN, IGP, swisstopo, and the GIS User Community',
-        maxZoom: 23,
-        maxNativeZoom: 17
-    }).addTo(myHeatMap.map);
+    // 1953 plants
+    d3.select("#build-heatmap-submit").on("click",()=>{
+        d3.event.stopPropagation()
+        d3.select("#map").html("");
+        d3.select("#map_controls").html("");
+        var myHeatMap = new BrAPIHeatMap("#map","#map_controls",
+            d3.select('[name="endpoint"]').node().value,
+            d3.select('[name="studyDbId"]').node().value,
+            {
+                defaultPos:[3.9021624,7.5051418],
+                observationLevel:"plant",
+                draw_controls:true,
+                draw_control_trait:true,
+                draw_control_unit:true,
+                draw_control_rep:true,
+                draw_control_block:true,
+        });
+        // L.tileLayer('http://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{
+        //     attribution: '&copy; <a href="http://www.esri.com/">Esri<\/a>, DigitalGlobe, GeoEye, i-cubed, USDA FSA, USGS, AEX, Getmapping, Aerogrid, IGN, IGP, swisstopo, and the GIS User Community',
+        //     maxZoom: 23,
+        //     maxNativeZoom: 19
+        // }).addTo(myHeatMap.map);
+        return false;
+    });
     </script>
   </body>
 </html>

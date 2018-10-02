@@ -3,7 +3,7 @@ import d3 from "d3";
 export default function(HeatMap){
   HeatMap.prototype.trait_set = function(t){
     this.controls._trait = t;
-    this.colorscale = d3.scaleSequential(d3.interpolateViridis);
+    this.colorscale = d3.scaleSequential(d3.interpolatePlasma);
     let trait_accessor = this.trait_accessor(t);
     this.colorscale.domain(
       d3.extent(
@@ -13,7 +13,7 @@ export default function(HeatMap){
     );
     this.traitcolor = obs=>{
       let val = trait_accessor(obs);
-      if(val==undefined) return "black";
+      if(val==undefined) return "none";
       return this.colorscale(val);
     };
     this._redraw_scale();
