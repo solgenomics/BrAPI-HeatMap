@@ -1,4 +1,5 @@
 <script src="leaflet.js"></script>
+<script src="L.CanvasLayer.js"></script>
 <script src="d3.js"></script>
 <script src="turf.js"></script>
 <script src="BrAPI.js"></script>
@@ -10,11 +11,13 @@
 // 1649
 // 2812
 // 1953 plants
+    var myHeatMap;
     d3.select("#build-heatmap-submit").on("click",()=>{
         d3.event.stopPropagation()
         d3.select("#map").html("");
         d3.select("#map_controls").html("");
-        var myHeatMap = new BrAPIHeatMap("#map","#map_controls",
+        if(myHeatMap) myHeatMap.map.remove();
+        myHeatMap = new BrAPIHeatMap("#map","#map_controls",
             d3.select('[name="endpoint"]').node().value,
             d3.select('[name="studyDbId"]').node().value,
             {
@@ -26,11 +29,26 @@
                 draw_control_rep:true,
                 draw_control_block:true,
         });
-        // L.tileLayer('http://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{
-        //     attribution: '&copy; <a href="http://www.esri.com/">Esri</a>, DigitalGlobe, GeoEye, i-cubed, USDA FSA, USGS, AEX, Getmapping, Aerogrid, IGN, IGP, swisstopo, and the GIS User Community',
-        //     maxZoom: 23,
-        //     maxNativeZoom: 19
-        // }).addTo(myHeatMap.map);
+        console.log("yellow");
+        L.tileLayer('http://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{
+            attribution: '&copy; <a href="http://www.esri.com/">Esri</a>, DigitalGlobe, GeoEye, i-cubed, USDA FSA, USGS, AEX, Getmapping, Aerogrid, IGN, IGP, swisstopo, and the GIS User Community',
+            maxZoom: 23,
+            maxNativeZoom: 19
+        }).addTo(myHeatMap.map);
+        
+        myHeatMap.getTraits().then(traits=>{
+            let opts = d3.select("#trait_select").selectAll("option:not([disabled])")
+                .data(traits);
+            opts.exit().remove();
+            opts.enter().append("option")
+                .merge(opts)
+                .text(t=>t.name)
+                .attr("value",t=>t.id);
+            d3.select("#trait_select").on("change",null).on("change",function(){
+                myHeatMap.setTrait(d3.select("#trait_select").node().value);
+            })
+        });
+        
         return false;
     });
 </script>

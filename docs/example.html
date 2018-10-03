@@ -15,13 +15,20 @@
     <div class="forward-container">
       <link rel="stylesheet" href="leaflet.css">
       <link rel="stylesheet" property="stylesheet" href="/dist/BrAPIHeatMap.css">
-      <form class="form-inline" action="#" style="padding:10px;">
+      <form class="form-inline" style="padding:10px;">
         <div class="form-group">
           <label for="endpoint">BrAPI Base URL</label> <input type="text" class="form-control" name="endpoint" value="https://cassavabase.org/brapi/v1">
         </div>
         <div class="form-group">
-          <label for="studyDbId">Study ID</label> <input type="text" class="form-control" name="studyDbId" value="1953">
-        </div><button type="submit" id="build-heatmap-submit" class="btn btn-default">Build Heatmap</button>
+          <label for="studyDbId">Study ID</label> <input type="text" class="form-control" name="studyDbId" value="4015">
+        </div><a type="submit" id="build-heatmap-submit" class="btn btn-default">Build Heatmap</a>
+      </form><br>
+      <form class="form-inline">
+        <select id="trait_select" class="form-control">
+          <option disabled selected>
+            Select a Trait
+          </option>
+        </select>
       </form>
     </div>
     <div class="brapp-container" style="position:relative;">
@@ -38,6 +45,7 @@
         </div>
       </div>
     </div><script src="leaflet.js">
+</script> <script src="L.CanvasLayer.js">
 </script> <script src="d3.js">
 </script> <script src="turf.js">
 </script> <script src="BrAPI.js">
@@ -49,11 +57,13 @@
     // 1649
     // 2812
     // 1953 plants
+    var myHeatMap;
     d3.select("#build-heatmap-submit").on("click",()=>{
         d3.event.stopPropagation()
         d3.select("#map").html("");
         d3.select("#map_controls").html("");
-        var myHeatMap = new BrAPIHeatMap("#map","#map_controls",
+        if(myHeatMap) myHeatMap.map.remove();
+        myHeatMap = new BrAPIHeatMap("#map","#map_controls",
             d3.select('[name="endpoint"]').node().value,
             d3.select('[name="studyDbId"]').node().value,
             {
@@ -65,11 +75,26 @@
                 draw_control_rep:true,
                 draw_control_block:true,
         });
-        // L.tileLayer('http://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{
-        //     attribution: '&copy; <a href="http://www.esri.com/">Esri<\/a>, DigitalGlobe, GeoEye, i-cubed, USDA FSA, USGS, AEX, Getmapping, Aerogrid, IGN, IGP, swisstopo, and the GIS User Community',
-        //     maxZoom: 23,
-        //     maxNativeZoom: 19
-        // }).addTo(myHeatMap.map);
+        console.log("yellow");
+        L.tileLayer('http://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{
+            attribution: '&copy; <a href="http://www.esri.com/">Esri<\/a>, DigitalGlobe, GeoEye, i-cubed, USDA FSA, USGS, AEX, Getmapping, Aerogrid, IGN, IGP, swisstopo, and the GIS User Community',
+            maxZoom: 23,
+            maxNativeZoom: 19
+        }).addTo(myHeatMap.map);
+        
+        myHeatMap.getTraits().then(traits=>{
+            let opts = d3.select("#trait_select").selectAll("option:not([disabled])")
+                .data(traits);
+            opts.exit().remove();
+            opts.enter().append("option")
+                .merge(opts)
+                .text(t=>t.name)
+                .attr("value",t=>t.id);
+            d3.select("#trait_select").on("change",null).on("change",function(){
+                myHeatMap.setTrait(d3.select("#trait_select").node().value);
+            })
+        });
+        
         return false;
     });
     </script>

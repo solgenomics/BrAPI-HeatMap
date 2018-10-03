@@ -1,187 +1,49 @@
 (function (global, factory) {
-  typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory(require('d3'), require('@turf/turf'), require('leaflet'), require('@solgenomics/brapijs')) :
-  typeof define === 'function' && define.amd ? define(['d3', '@turf/turf', 'leaflet', '@solgenomics/brapijs'], factory) :
-  (global.BrAPIHeatMap = factory(global.d3,global.turf,global.L,global.BrAPI));
-}(this, (function (d3,turf,L,BrAPI) { 'use strict';
+  typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory(require('@turf/turf'), require('d3'), require('leaflet')) :
+  typeof define === 'function' && define.amd ? define(['@turf/turf', 'd3', 'leaflet'], factory) :
+  (global.BrAPIHeatMap = factory(global.turf,global.d3,global.L));
+}(this, (function (turf$1,d3,L) { 'use strict';
 
+  turf$1 = turf$1 && turf$1.hasOwnProperty('default') ? turf$1['default'] : turf$1;
   d3 = d3 && d3.hasOwnProperty('default') ? d3['default'] : d3;
-  turf = turf && turf.hasOwnProperty('default') ? turf['default'] : turf;
   L = L && L.hasOwnProperty('default') ? L['default'] : L;
-  BrAPI = BrAPI && BrAPI.hasOwnProperty('default') ? BrAPI['default'] : BrAPI;
 
-  function _redraw(HeatMap){
-    
-    HeatMap.prototype._redraw = function(){    
-      var layout_data = d3.values(this.layout_data);
-      this._redraw_obsUnits(layout_data);
-      this._redraw_reps(layout_data);
-      this._redraw_blocks(layout_data);
-      this.resize();
-    };
-    
-    HeatMap.prototype.resize = function(){
-      // reposition SVG inside leaflet layer
-      let padding = 1000;
-      var bbox = this.zoomer.node().getBBox();
-      this.svg.attr("width", bbox.width + 2*padding)
-        .attr("height", bbox.height + 2*padding)
-        .style("left", bbox.x-padding + "px")
-        .style("top", bbox.y-padding + "px");
-      this.zoomer.attr("transform", `translate(${-bbox.x+padding},${-bbox.y+padding})`);
-    };
-    
-    HeatMap.prototype._redraw_controls = function(){
-      if(!this.opts.draw_controls) return
-      if(this.opts.draw_control_trait){
-        this.controls.traits.style("display",null);
-        var trait_observations = d3.values(this.layout_data).reduce((traits,obs)=>{
-          obs.observations.forEach(ob=>{
-            let t = ob.observationVariableDbId;
-            if(!traits[t]) traits[t] = {name:ob.observationVariableName,count:0};
-            traits[t].count+=1;
-          });
-          return traits;
-        },{});
-        var opts = this.controls.traits.selectAll("option").data(
-          d3.entries(trait_observations)
-        );
-        opts.exit().remove();
-        opts.enter().append("option").merge(opts)
-          .attr("value",d=>d.key)
-          .attr("disabled",null)
-          .attr("selected",null)
-          .text(d=>`${d.value.name} (${d.value.count} observations)`);
-        this.controls.traits.append("option").lower()
-          .text("Select a trait")
-          .attr("disabled",true)
-          .attr("selected",true);
-      }
-      else {
-        this.controls.traits.style("display","none");
-      }
-      if(this.opts.draw_control_trait){
-        this.controls.units.style("display",null);
-      } else {
-        this.controls.units.style("display","none");
-      }
-
-    };
-    
-    HeatMap.prototype._redraw_scale = function(){
-      let tickscale = d3.scaleLinear().domain([0,1]).range(this.colorscale.domain());
-      let count = 9;
-      let colors = (this.controls._trait!=null?[0,0.125,0.25,0.375,0.5,0.625,0.75,0.875,1]:[])
-        .map(tickscale).map((d,i)=>({
-          col:this.colorscale(d),
-          val:(i==0||i==count-1)?d:""
-        })
-      );
-      let blocks = this.controls.legend.selectAll(".HeatMap_legendBlock")
-        .data(colors);
-      blocks.exit().remove();
-      let newBlocks = blocks.enter().append("g").classed("HeatMap_legendBlock",true);
-      newBlocks.append("rect")
-        .attr("x",(d,i)=>(18+2)*i).attr("y",0)
-        .attr("width",18).attr("height",20);
-      newBlocks.append("text")
-        .attr("x",(d,i)=>(18+2)*i+9).attr("y",22)
-        .attr("text-anchor","middle")
-        .attr("alignment-baseline","hanging");
-      newBlocks.merge(blocks).select("rect").attr("fill",d=>d.col);
-      newBlocks.merge(blocks).select("text").text(d=>d.val);
-      
-    };
-
-    HeatMap.prototype._redraw_obsUnits = function(layout_data){
-      var units = this.obsUnits.selectAll(".HeatMap_obsUnit")
-        .data(layout_data,d=>d.observationUnitDbId);
-      units.exit().remove();
-      var newUnits = units.enter().append("g")
-        .classed("HeatMap_obsUnit",true)
-        .style("pointer-events","visible")
-        .on("mouseover", (d)=>this.focus_unit(d))
-        .on("mouseout", (d)=>this.focus_unit(null));
-      newUnits.append("path")
-        .attr("stroke","none")
-        .attr("stroke-width","0.25px")
-        .attr("vector-effect","non-scaling-stroke")
-        .style("pointer-events","visible");
-      newUnits.append("text")
-        .attr("text-anchor","middle")
-        .attr("alignment-baseline","middle")
-        .attr("fill","white")
-        .text(obs=>(obs.plotNumber)+(obs.plantNumber?":"+obs.plantNumber:""))
-        .style("pointer-events","visible");
-
-      newUnits.merge(units)
-        .select("path")
-        .attr("fill",(obs)=>{
-          // HeatMap color!
-          if(this.controls._trait==undefined){
-            // No selected trait!
-            return "none"
-          }
-          return this.traitcolor(obs)
-        })
-        .attr("d",obs=>{
-          return this.geoPath(this.shape_obsUnit(obs))
-        });
-      newUnits.merge(units).select("text")
-        .attr("x",obs=>{
-          return this.geoPath.centroid(this.shape_obsUnit(obs))[0]
-        })
-        .attr("y",obs=>{
-          return this.geoPath.centroid(this.shape_obsUnit(obs))[1]
-        })
-        .attr("font-size",obs=>{
-          var squareedge = Math.sqrt(this.geoPath.area(this.shape_obsUnit(obs)));
-          return (squareedge/5) || 0;
-        });
-    };
-
-    HeatMap.prototype._redraw_reps = function(layout_data){
-      var reps = this.reps.selectAll(".HeatMap_rep")
-        .data(d3.nest().key(d=>d.replicate).entries(layout_data),d=>d.key);
-      reps.exit().remove();
-      reps.enter().append("path").classed("HeatMap_rep",true)
-        .attr("fill","none")
-        .attr("stroke","blue")
-        .attr("stroke-width","4px")
-        .attr("vector-effect","non-scaling-stroke")
-      .merge(reps)
-        .attr("d",d=>this.geoPath(this._rep_shapes[d.key]));  
-    };
-
-    HeatMap.prototype._redraw_blocks = function(layout_data){
-      var blocks = this.blocks.selectAll(".HeatMap_block")
-        .data(d3.nest().key(d=>d.blockNumber).entries(layout_data),d=>d.key);
-      blocks.exit().remove();
-      blocks.enter().append("path").classed("HeatMap_block",true)
-        .attr("fill","none")
-        .attr("stroke","white")
-        .attr("stroke-width","1.5px")
-        .attr("vector-effect","non-scaling-stroke")
-      .merge(blocks)
-        .attr("d",d=>this.geoPath(this._block_shapes[d.key]));
-    };
-  }
-
-  function defaultPlot(HeatMap){
-    HeatMap.prototype.defaultPlot_init = function(){
-      this.opts.gridHeight = turf.distance(this.opts.defaultPos,turf.along(turf.lineString([this.opts.defaultPos,[this.opts.defaultPos[0],this.opts.defaultPos[1]-1]]),this.opts.gridDist*this.opts.gridSize),{'units':"degrees"})/this.opts.gridSize;
-      this.opts.gridWidth = turf.distance(this.opts.defaultPos,turf.along(turf.lineString([this.opts.defaultPos,[this.opts.defaultPos[0]+1,this.opts.defaultPos[1]]]),this.opts.gridDist*this.opts.gridSize),{'units':"degrees"})/this.opts.gridSize;
-      this.opts.shape_memo = Array(this.opts.gridSize*this.opts.gridSize);
-      this.opts.subshape_memo = Array(this.opts.gridSize*this.opts.gridSize);
-    };
-    
-    HeatMap.prototype.defaultPlot = function(row,col){
+  function defaultPlot(HeatMap){  
+    HeatMap.prototype.defaultPlot = function(row,col,size){
+      size = size || this.opts.defaultPlotWidth;
+      if(!this.opts.shape_memo || this.opts.shape_memo.size!=size){
+        this.opts.shape_memo = Array(this.opts.gridSize*this.opts.gridSize);
+        this.opts.shape_memo.size = size;
+      } 
+      console.log(size);
       if(!this.opts.shape_memo[(row*this.opts.gridSize)+col]){
-        let top = this.opts.defaultPos[1] - this.opts.gridHeight * (row+1);
-        let bottom = this.opts.defaultPos[1] - this.opts.gridHeight * row;
-        let left = this.opts.defaultPos[0] + this.opts.gridWidth * col;
-        let right = this.opts.defaultPos[0] + this.opts.gridWidth * (col+1);
-        this.opts.shape_memo[(row*this.opts.gridSize)+col] = turf.polygon([
-          [[left,bottom], [right,bottom], [right,top], [left,top], [left,bottom]]
+        var o = turf$1.point(this.opts.defaultPos);
+        var tl = turf$1.destination(
+          turf$1.destination(
+            o,
+            size*col,
+            90,
+            {'units':'kilometers'}
+          ),
+          size*row,
+          180,
+          {'units':'kilometers'}
+        );
+        var br = turf$1.destination(
+          turf$1.destination(
+            tl,
+            size,
+            90,
+            {'units':'kilometers'}
+          ),
+          size,
+          180,
+          {'units':'kilometers'}
+        );
+        var tr = turf$1.point([tl.geometry.coordinates[0],br.geometry.coordinates[1]]);
+        var bl = turf$1.point([br.geometry.coordinates[0],tl.geometry.coordinates[1]]);
+        this.opts.shape_memo[(row*this.opts.gridSize)+col] = turf$1.polygon([
+          [tl, tr, br, bl, tl].map(turf$1.getCoord)
         ], {});
       }
       return this.opts.shape_memo[(row*this.opts.gridSize)+col];
@@ -204,285 +66,38 @@
     };
   }
 
-  function focus(HeatMap){
-    HeatMap.prototype.focus_unit = function(obs){
-      var focus_block = obs?obs.blockNumber:null;
-      var focus_rep = obs?obs.replicate:null;
-      this.obsUnits.selectAll(".HeatMap_obsUnit")
-        .classed("HeatMap_obsUnit-focus",false)
-        .filter(d=>d==obs)
-        .classed("HeatMap_obsUnit-focus",true)
-        .raise();
-      this.blocks.selectAll(".HeatMap_block")
-        .classed("HeatMap_block-focus",false)
-        .filter(d=>d.key==focus_block)
-        .classed("HeatMap_block-focus",true)
-        .raise();
-      this.reps.selectAll(".HeatMap_rep")
-        .classed("HeatMap_rep-focus",false)
-        .filter(d=>d.key==focus_rep)
-        .classed("HeatMap_rep-focus",true)
-        .raise();
-    };
-  }
-
-  function shape(HeatMap){
-    HeatMap.prototype.shape_reshape = function(){
-      this._obsUnit_shapes = {};
-      this._obsUnit_plots = {};
-      var layout_data = d3.values(this.layout_data);
-      if(layout_data.every(d=>!isNaN(d.X)&&!isNaN(d.Y))){
-        // has coordinates
-        if(layout_data.every(d=>d.X==Math.floor(d.X)&&d.Y==Math.floor(d.Y))){
-          // all integers, col/row not lat/long
-          var same_pos = {};
-          layout_data.forEach(obs=>{
-            if(same_pos[obs.Y+","+obs.X]){
-              same_pos[obs.Y+","+obs.X].push(obs.observationUnitDbId);
-            }
-            else{
-              same_pos[obs.Y+","+obs.X] = [obs.observationUnitDbId];
-              same_pos[obs.Y+","+obs.X].pos = [obs.Y,obs.X];
-            }
-          });
-          d3.values(same_pos).forEach(group=>{
-            let polygon = this.defaultPlot(group.pos[0],group.pos[1]);
-            let subdiv = this.polygon_subdivide(
-              polygon,group.length
-            );
-            group.forEach((obs_id,i)=>{
-              this._obsUnit_plots[obs_id] = polygon;
-              this._obsUnit_shapes[obs_id] = subdiv[i];
-            });
-          });
-        }
-      }
-      else {
-        // position should be determined by rep/block/plot
-        // picks a field width that trys to the median block-length evenly
-        var plot_counts = d3.nest().key(d=>d.plotNumber).rollup(g=>g.length).entries(layout_data);
-        var block_counts = d3.nest().key(d=>d.blockNumber).key(d=>d.plotNumber).rollup(g=>g.length).entries(layout_data);
-        var bllen = Math.round(d3.median(block_counts,n=>n.values.length));
-        var squarelen = Math.round(Math.sqrt(plot_counts.length));
-        var lyt_width;
-        if(squarelen==bllen){
-          lyt_width = squarelen;
-        }
-        else if (squarelen>bllen) {
-          lyt_width = Math.round(squarelen/bllen)*bllen;
-        }
-        else {
-          var closest_up = (bllen%squarelen)/Math.floor(bllen/squarelen);
-          var closest_down = (squarelen-bllen%squarelen)/Math.ceil(bllen/squarelen);
-          lyt_width = Math.round(
-            closest_up<=closest_down? 
-              squarelen+closest_up: 
-              squarelen-closest_down
-          );
-        }
-        var plot_pos = {};
-        var next_pos = 0;
-        var same_pos = {};
-        layout_data.sort(this.defaultPlot_sort).forEach((obs)=>{
-          var pos = plot_pos[obs.plotNumber]!=undefined?plot_pos[obs.plotNumber]:(plot_pos[obs.plotNumber] = next_pos++);
-          var row = Math.floor(pos/lyt_width);
-          var col = (pos%lyt_width);
-          if (row%2==1) col = (lyt_width-1)-col;
-          if(same_pos[row+","+col]){
-            same_pos[row+","+col].push(obs.observationUnitDbId);
-          }
-          else{
-            same_pos[row+","+col] = [obs.observationUnitDbId];
-            same_pos[row+","+col].pos = [row,col];
-          }
-        });
-        d3.values(same_pos).forEach(group=>{
-          let polygon = this.defaultPlot(group.pos[0],group.pos[1]);
-          let subdiv = this.polygon_subdivide(
-            polygon,group.length
-          );
-          group.forEach((obs_id,i)=>{
-            this._obsUnit_plots[obs_id] = polygon;
-            this._obsUnit_shapes[obs_id] = subdiv[i];
-          });
-        });
-      }
-      this._rep_shapes = {};
-      d3.nest().key(d=>d.replicate).entries(layout_data).forEach(d=>{
-        this._rep_shapes[d.key] = this.shape_rep(d.key);
-      });
-      this._block_shapes = {};
-      d3.nest().key(d=>d.blockNumber).entries(layout_data).forEach(d=>{
-        this._block_shapes[d.key] = this.shape_block(d.key);
-      });
-      this.redraw();
-      var bb = this.shape_bounds();
-      this.map.fitBounds([[bb[1],bb[0]],[bb[3],bb[2]]]);
-    };
-
-    HeatMap.prototype.shape_obsUnit = function(obs){
-      return this._obsUnit_shapes[obs.observationUnitDbId];
-    };
-
-    HeatMap.prototype.shape_bounds = function(){
-      return turf.bbox(
-        turf.featureCollection(
-          d3.values(this._obsUnit_shapes)
-        )
-      );
-    };
-
-    // HeatMap.prototype.shape_hullDist = function(feature_collection){
-    //   var length = feature_collection.features.length;
-    //   return Math.sqrt(d3.max(feature_collection.features,f=>turf.area(f)))/1000*1.01;
-    // }
-
-    HeatMap.prototype.shape_concave_hull = function(obsUnits){
-      return turf.union(...obsUnits.map(obs=>this._obsUnit_plots[obs.observationUnitDbId]));
-      // var feature_collection = turf.featureCollection(
-      //   obsUnits.reduce((a,obs)=>{
-      //     a.push(this._obsUnit_shapes[obs.observationUnitDbId]);
-      //     a.push(turf.centroid(this._obsUnit_shapes[obs.observationUnitDbId]));
-      //     return a;
-      //   },[])
-      // );
-      // return turf.concave(
-      //   turf.explode(feature_collection),
-      //   {maxEdge:this.shape_hullDist(feature_collection),units:'kilometers'}
-      // );
-    };
-
-    HeatMap.prototype.shape_block = function(bn){
-      return this.shape_concave_hull(
-        d3.values(this.layout_data).filter(d=>d.blockNumber==bn)
-      );
-    };
-
-    HeatMap.prototype.shape_rep = function(rn){
-      return this.shape_concave_hull(
-        d3.values(this.layout_data).filter(d=>d.replicate==rn)
-      );
-    };
-    HeatMap.prototype.polygon_subdivide_memo = {};
-    HeatMap.prototype.polygon_subdivide = function(polygon,divisions){
-      if(!divisions||divisions<2){
-        return [polygon]
-      }
-      else{
-        let memo_id = `(${divisions})${JSON.stringify(polygon.geometry.coordinates)}`;
-        if (!this.polygon_subdivide_memo[memo_id]){
-          let polygonbbox = turf.bbox(polygon);
-          polygonbbox[0]-=0.00001;
-          polygonbbox[1]-=0.00001;
-          polygonbbox[2]+=0.00001;
-          polygonbbox[3]+=0.00001;
-          let grid_dist = (Math.sqrt(turf.area(polygon))/1000)/(2*divisions);
-          let grid = turf.pointGrid(
-            polygonbbox,
-            grid_dist,
-            {'mask':polygon}
-          );
-          //more random!
-          grid.features.forEach(f=>{
-            f.geometry.coordinates=f.geometry.coordinates.map(c=>c+=Math.random()*0.000002-0.000001);
-          });
-          let clustered = turf.clustersKmeans(
-            grid,
-            {'numberOfClusters':divisions,'mutate':true}
-          );
-          let centroids = [];
-          for (var i = 0; i < divisions; i++) {
-            centroids.push(
-              turf.centroid(
-                turf.getCluster(clustered, {cluster: i})
-              )
-            );
-          }
-          var voronoi = turf.voronoi(
-            turf.featureCollection(centroids),
-            {'bbox':polygonbbox}
-          );
-          this.polygon_subdivide_memo[memo_id] = voronoi.features.map(vc=>{
-            var mask = turf.mask(vc,turf.bboxPolygon(polygonbbox));
-            var c = turf.difference(polygon,mask);
-            return c
-          });
-        }
-        return this.polygon_subdivide_memo[memo_id];
-      }
-    };
-  }
-
-  function startLoad(HeatMap){
-    /**
-     * Loads Phenotype/ObservationUnit Data via BrAPI
-     */
-    HeatMap.prototype.startLoad = function(){
-      this.fieldLayout.classed("Heatmap_loading",true);
-      this.layout_data = {};
-      this.controls.unit_sel.attr("disabled",true);
-      BrAPI(this.brapi_endpoint,this.opts.brapi_auth,"1.2")
-        .phenotypes_search({
-          "studyDbIds":[this.studyDbId],
-          "observationLevel":this.opts.observationLevel,
-          'pageSize':this.opts.brapi_pageSize
-        })
-        .each(d=>{
-          d.X = parseFloat(d.X);
-          d.Y = parseFloat(d.Y);
-          this.layout_data[d.observationUnitDbId] = d;
-          this.reshape();
-        })
-        .all(()=>{
-          this.fieldLayout.classed("Heatmap_loading",false);
-          this._redraw_controls();
-          this.controls.unit_sel.attr("disabled",null);
-          console.log(this.layout_data);
-        });
-    };
-  }
-
-  function trait(HeatMap){
-    HeatMap.prototype.trait_set = function(t){
-      this.controls._trait = t;
-      this.colorscale = d3.scaleSequential(d3.interpolatePlasma);
-      let trait_accessor = this.trait_accessor(t);
-      this.colorscale.domain(
-        d3.extent(
-          d3.values(this.layout_data),
-          trait_accessor
-        )
-      );
-      this.traitcolor = obs=>{
-        let val = trait_accessor(obs);
-        if(val==undefined) return "none";
-        return this.colorscale(val);
-      };
-      this._redraw_scale();
-      this.redraw();
-    };
-
-    HeatMap.prototype.trait_accessor = function(t){
-      return obs=>d3.mean(
-        obs.observations.filter(ob=>ob.observationVariableDbId==t),
-        ob=>ob.value
-      );
-    };
-  }
+  // import turf from "@turf/turf";
+  // 
+  // export default function(HeatMap){
+  //   HeatMap.prototype.setDefaultPlotSize = function(size){ // size is width in km
+  //     this.opts._plotsize = size;
+  //     this.opts.gridHeight = turf.distance(this.opts.defaultPos,turf.along(turf.lineString([this.opts.defaultPos,[this.opts.defaultPos[0],this.opts.defaultPos[1]-1]]),size*this.opts.gridSize),{'units':"degrees"})/this.opts.gridSize;
+  //     this.opts.gridWidth = turf.distance(this.opts.defaultPos,turf.along(turf.lineString([this.opts.defaultPos,[this.opts.defaultPos[0]+1,this.opts.defaultPos[1]]]),size*this.opts.gridSize),{'units':"degrees"})/this.opts.gridSize;
+  //     this.opts.shape_memo = Array(this.opts.gridSize*this.opts.gridSize);
+  //   }
+  // 
+  //   HeatMap.prototype.defaultPlot = function(row,col){
+  //     if(!this.opts.shape_memo[(row*this.opts.gridSize)+col]){
+  //       let top = this.opts.defaultPos[1] - this.opts.gridHeight * (row+1);
+  //       let bottom = this.opts.defaultPos[1] - this.opts.gridHeight * row;
+  //       let left = this.opts.defaultPos[0] + this.opts.gridWidth * col;
+  //       let right = this.opts.defaultPos[0] + this.opts.gridWidth * (col+1);
+  //       this.opts.shape_memo[(row*this.opts.gridSize)+col] = turf.polygon([
+  //         [[left,bottom], [right,bottom], [right,top], [left,top], [left,bottom]]
+  //       ], {});
+  //     }
+  //     return this.opts.shape_memo[(row*this.opts.gridSize)+col];
+  //   }
+  // }
 
   const DEFAULT_OPTS = {
     observationLevel:"plot",
+    trait:null, // 76913 76900 76884 76861
     brapi_auth:null,
     brapi_pageSize:1000,
     defaultPos: [-39.0863,-12.6773],
     gridSize: 500,
-    gridDist: 0.002,
-    zoomAnimation:false,
-    draw_controls:true,
-    draw_control_trait:true,
-    draw_control_unit:true,
-    draw_control_rep:true,
-    draw_control_block:true,
+    defaultPlotWidth: 0.002,
   };
 
   class HeatMap {
@@ -495,100 +110,424 @@
       
       // Parse Options
       this.opts = Object.assign(Object.create(DEFAULT_OPTS),opts||{});
-      
-      // Create Default Plot Positions
-      this.defaultPlot_init();
-
-      // Set up debouncing
-      this.reshape = debounceThrottle(()=>this.shape_reshape());
-      this.redraw = debounceThrottle(()=>this._redraw());
 
       // Set up Leaflet Map
-      this.map = L.map(this.map_container.node(),{zoomAnimation:this.opts.zoomAnimation,zoomSnap:0.1});
-      this.map.on('viewreset', ()=>this._redraw());
-      this.map.on('resize', ()=>this._redraw());
-      this.map.on('zoomend', ()=>this._redraw());
-
-      // Set up Map projection
-      let thismap = this.map;
-      let transform = d3.geoTransform({point: function(x, y){
-        var point = thismap.latLngToLayerPoint(new L.LatLng(y, x));
-        this.stream.point(point.x, point.y);
-      }});
-      this.geoPath = d3.geoPath().projection(transform);
-
-      // Set up SVG overlay
-      this.svg = d3.select(this.map.getPanes().overlayPane).append("svg")
-        .style("top",0)
-        .style("left",0);
-      this.zoomer = this.svg.append("g").attr("class", "leaflet-zoom-hide zoom-hide-transition");
-      this.content = this.zoomer.append("g");
-      this.fieldLayout = this.content.classed("HeatMap_layout",true);
-      this.obsUnits = this.fieldLayout.append("g").classed("HeatMap_obsUnits",true);
-      this.reps = this.fieldLayout.append("g").classed("HeatMap_reps",true);
-      this.blocks = this.fieldLayout.append("g").classed("HeatMap_blocks",true);
-
-      // Set up the Controls
-      this.controls.div = this.controls.container.append("div")
-        .classed("HeatMap_controls",true)
-        .style("padding","10px 10px 0px 10px");
-      this.controls.units = this.controls.div.append("div");
-      this.controls.units.append("span").text("Observation Level");
-      this.controls.unit_sel = this.controls.units.append("select");
-      this.controls.unit_sel.append("option").attr("value","plot")
-        .text("Plot")
-        .attr("selected",this.opts.observationLevel=="plot"?true:null);
-      this.controls.unit_sel.append("option").attr("value","plant")
-        .text("Plant")
-        .attr("selected",this.opts.observationLevel=="plant"?true:null);
-      this.controls.unit_sel.on("change",()=>{
-        this.opts.observationLevel = this.controls.unit_sel.node().value;
-        this.startLoad();
-        this.trait_set(null);
-      });
-      this.controls.traits = this.controls.div.append("select")
-        .classed("HeatMap_trait_select",true);
-      this.controls.div.append("br");
-      this.controls.legend = this.controls.div.append("svg")
-        .attr("width", 280)
-        .attr("height", 45)
-        .append("g")
-        .attr("transform", "translate(0,10)");
-      this.controls.traits.on("change",()=>{
-        this.trait_set(this.controls.traits.node().value);
-      });
-
+      this.map = L.map(
+        this.map_container.node(),
+        {
+          zoomSnap:0.1,
+          zoom: 17
+        }
+      );
+      
       // Load Data
       this.layout_data = {};
-      this.startLoad();
+      this.load_ObsUnits();
+      
+      this.canvLayer = L.canvasLayer()
+        .delegate(this)
+        .addTo(this.map);
     }
-  }
-   _redraw(HeatMap);
-   defaultPlot(HeatMap);
-   focus(HeatMap);
-   shape(HeatMap);
-   startLoad(HeatMap);
-   trait(HeatMap);
-
-  function debounceThrottle(f){ //triggers f every 200ms while called within 25ms repeatedly
-    var db;
-    var th;
-    return ()=>{
-      clearTimeout(db);
-      db = setTimeout(() => {
-        clearTimeout(th);
-        th = false;
-        f();
-      }, 25);
-      if(!th){
-        th = setTimeout(() => {
-          clearTimeout(db);
-          th = false;
-          f();
-        }, 200);
+    
+    onDrawLayer(info) {
+      var ctx = info.canvas.getContext('2d');
+      let map = this.map;
+      let transform = d3.geoTransform({point: function(x,y){
+        var point = info.layer._map.latLngToContainerPoint([y, x]);
+        this.stream.point(point.x,point.y);
+      }});
+      let geoPath = d3.geoPath().context(ctx).projection(transform);
+      this.data.then(d=>{
+        ctx.clearRect(0, 0, info.canvas.width, info.canvas.height);
+        ctx.textBaseline = "middle";
+        ctx.textAlign = "center";
+        d.plots.forEach(plot=>{
+          ctx.fillStyle = plot.fillColor;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          geoPath(plot.geoJSON);
+          ctx.fill();
+          ctx.fillStyle = plot.textColor;
+          var fontSize = Math.sqrt(geoPath.area(plot.geoJSON))/5;
+          ctx.font = fontSize+'px monospace';
+          var centroid = geoPath.centroid(plot.geoJSON);
+          ctx.fillText(plot.plotNumber, centroid[0], centroid[1]);
+        });
+        d.reps.forEach(rep=>{
+          ctx.strokeStyle = "blue";
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          geoPath(rep.geoJSON);
+          ctx.stroke();
+        });
+        d.blocks.forEach(block=>{
+          ctx.strokeStyle = "white";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          geoPath(block.geoJSON);
+          ctx.stroke();
+        });
+      });
+    }
+    
+    traitColor(data){
+      let colorScale;
+      if(!data.plot_traits[this.opts.trait]) colorScale = ()=>"transparent";
+      else colorScale = d3.scaleSequential(d3.interpolateMagma).domain([
+        data.plot_traits[this.opts.trait].min,
+        data.plot_traits[this.opts.trait].max
+      ]);
+      data.plots.forEach(plot=>{
+        let tObs = plot.observations.filter(obs=>obs.observationVariableDbId==this.opts.trait);
+        let avg = d3.mean(tObs,obs=>obs.value);
+        let c = d3.color(colorScale(avg));
+        if(c) c.opacity = 0.7;
+        plot.fillColor = tObs.length>0?c:"transparent";
+        plot.textColor = this.goodContrast(plot.fillColor);
+      });
+      return data;
+    }
+    
+    goodContrast(color){
+      color = d3.color(color).rgb();
+      let l = ( 0.299 * color.r + 0.587 * color.g + 0.114 * color.b)/255;
+      return l>0.5?"black":"white";
+    }
+    
+    setLevel(level){
+      if (level == "plot" || level == "plant") {
+        this.opts.observationLevel = level;
+        this.data = this.data.then(d=>this.traitColor(d));
+        this.canvLayer.drawLayer();
       }
+      else throw Error("not a valid observation level");
+    }
+    
+    getTraits(cb){
+      let out = this.data.then(d=>d3.values(d.plot_traits));
+      if(cb) out.then(cb);
+      else return out
+    }
+    
+    setTrait(tId){
+      console.log(tId,typeof tId);
+      this.opts.trait = tId;
+      this.data = this.data.then(d=>this.traitColor(d));
+      this.canvLayer.drawLayer();
+    }
+    
+    parseTraits(data){
+      data.plot_traits = {};
+      data.plant_traits = {};
+      data.plants.forEach(plant=>{
+        plant.observations.forEach(obs=>{
+          obs.observationVariableDbId = ""+obs.observationVariableDbId;
+          if(!data.plant_traits[obs.observationVariableDbId]){
+            data.plant_traits[obs.observationVariableDbId] = {
+              min:(Infinity),
+              max:(-Infinity),
+              name:obs.observationVariableName,
+              id:obs.observationVariableDbId
+            };
+          }
+          let t = data.plant_traits[obs.observationVariableDbId];
+          t.min = Math.min(obs.value,t.min);
+          t.max = Math.max(obs.value,t.max);
+        });
+      });
+      data.plots.forEach(plot=>{
+        plot.observations.forEach(obs=>{
+          obs.observationVariableDbId = ""+obs.observationVariableDbId;
+          if(!data.plot_traits[obs.observationVariableDbId]){
+            data.plot_traits[obs.observationVariableDbId] = {
+              min:(Infinity),
+              max:(-Infinity),
+              name:obs.observationVariableName,
+              id:obs.observationVariableDbId
+            };
+          }
+          let t = data.plot_traits[obs.observationVariableDbId];
+          t.min = Math.min(obs.value,t.min);
+          t.max = Math.max(obs.value,t.max);
+        });
+      });
+      return data
+    }
+    
+    shape(data){
+      data.shape = {};
+      // Shape Plots
+      let plotsHaveCoords = data.plots.every(plot=>(
+        !isNaN(plot.X) && !isNaN(plot.Y)
+      ));
+      let plotsRowColOnly = plotsHaveCoords && data.plots.every(plot=>(
+        plot.X==Math.floor(plot.X) && plot.Y==Math.floor(plot.Y)
+      ));
+      if(!plotsHaveCoords){
+        // No layout info, generate X/Y by guessing
+        // Auto-layout (layout width by even divisions of median block length near a perfect square)
+        var lyt_width = this.layout_width(
+          Math.round(d3.median(data.blocks,block=>block.values.length)),
+          data.plots.length
+        );
+        data.plots.forEach((plot,pos)=>{
+          let row = Math.floor(pos/lyt_width);
+          let col = (pos%lyt_width);
+          if (row%2==1) col = (lyt_width-1)-col;
+          plot.X = col;
+          plot.Y = row;
+        });
+      }
+      let plot_XY_groups = [];
+      let plotNumber_group = {};
+      // group by plots with the same X/Y
+      data.plots.forEach(plot=>{
+        plot_XY_groups[plot.X] = plot_XY_groups[plot.X] || [];
+        plot_XY_groups[plot.X][plot.Y] = plot_XY_groups[plot.X][plot.Y] || [];
+        plot_XY_groups[plot.X][plot.Y].push(plot);
+        plotNumber_group[plot.plotNumber] = plot_XY_groups[plot.X][plot.Y];
+      });
+      if (!plotsRowColOnly && plotsHaveCoords) {
+        // Voronoi-it
+        throw Error("Not Implemented");
+      }
+      else{
+        // use default plot generator
+        let plot_count = d3.mean(plot_XY_groups,x=>{
+          return x!=undefined?d3.mean(x,xy=>xy!=undefined?xy.length:null):null
+        });
+        let plotArea = plot_count*this.opts.defaultPlotWidth*this.opts.defaultPlotWidth;
+        let plotSize = Math.sqrt(plotArea);
+        // this.setDefaultPlotSize(Math.sqrt(plotArea));
+        for (let X in plot_XY_groups) {
+          if (plot_XY_groups.hasOwnProperty(X)) {
+            for (let Y in plot_XY_groups[X]) {
+              if (plot_XY_groups[X].hasOwnProperty(Y)) {
+                let polygon = this.defaultPlot(Y,X,plotSize);
+                // console.log("p",polygon);
+                plot_XY_groups[X][Y].forEach((plot,i)=>{
+                  plot.geoJSON = polygon;//this.splitPlot(polygon,plot_XY_groups[X][Y].length,i);
+                });
+              }
+            }
+          }
+        }
+      }
+      
+      let plant_XY_groups = [];
+      let plantsHaveCoords = data.plants.every(plant=>(
+        !isNaN(plant.X) && !isNaN(plant.Y)
+      ));
+      let plantsHavePlotNumber = data.plants.every(plant=>(
+        !isNaN(plant.plotNumber)
+      ));
+      let plantsRowColOnly = plantsHaveCoords && data.plants.every(plant=>(
+        plant.X==Math.floor(plant.X) && plant.Y==Math.floor(plant.Y)
+      ));
+      if(!plantsHaveCoords && plantsHavePlotNumber && plot_XY_groups){
+        data.plants.forEach(plant=>{
+          plant.X = plotNumber_group[plant.plotNumber][0].X;
+          plant.Y = plotNumber_group[plant.plotNumber][0].Y;
+        });
+      }
+      // group by plants with the same X/Y
+      data.plants.forEach(plant=>{
+        plant_XY_groups[plant.X] = plant_XY_groups[plant.X] || [];
+        plant_XY_groups[plant.X][plant.Y] = plant_XY_groups[plant.X][plant.Y] || [];
+        plant_XY_groups[plant.X][plant.Y].push(plant);
+      });
+      if (!plantsRowColOnly && plantsHaveCoords) {
+        // Voronoi-it
+        throw Error("Not Implemented");
+      }
+      else{
+        // use default plant generator
+        let plant_count = d3.mean(plant_XY_groups,x=>{
+          return x!=undefined?d3.mean(x,xy=>xy!=undefined?xy.length:null):null
+        });
+        let plantArea = plant_count*this.opts.defaultPlotWidth*this.opts.defaultPlotWidth;
+        let plantSize = Math.sqrt(plantArea);
+        for (let X in plant_XY_groups) {
+          if (plant_XY_groups.hasOwnProperty(X)) {
+            for (let Y in plant_XY_groups[X]) {
+              if (plant_XY_groups[X].hasOwnProperty(Y)) {
+                console.log(Y,X,plantSize);
+                let polygon = this.defaultPlot(Y,X,plantSize);
+                plant_XY_groups[X][Y].forEach((plant,i)=>{
+                  plant.geoJSON = polygon;
+                });
+              }
+            }
+          }
+        }
+      }
+      
+      // Has geoJSON
+      data.blocks.forEach(block=>{
+        block.geoJSON = turf.union(...block.values.map(ou=>turf.truncate(ou.geoJSON)));
+      });
+      data.reps.forEach(rep=>{
+        rep.geoJSON = turf.union(...rep.values.map(ou=>turf.truncate(ou.geoJSON)));
+      });
+      
+      if(this.new_data){
+        var bbox = turf.bbox(turf.featureCollection(data[this.opts.observationLevel+"s"].map(ou=>ou.geoJSON)));
+        this.map.fitBounds([[bbox[1],bbox[0]],[bbox[3],bbox[2]]]);
+      }
+      
+      return data;
+    }
+    
+    splitPlot(polygon,partitions,index){
+      this.splitPlot_memo = this.splitPlot_memo || {};
+      let memo_key = `(${partitions})${polygon.geometry.coordinates.join(",")}`;
+      if(this.splitPlot_memo[memo_key]) return this.splitPlot_memo[memo_key][index];
+      if(!partitions||partitions<2) return (this.splitPlot_memo[memo_key] = [polygon])[index];
+      
+      let polygonbbox = turf.bbox(polygon);
+      polygonbbox[0]-=0.00001; polygonbbox[1]-=0.00001; polygonbbox[2]+=0.00001; polygonbbox[3]+=0.00001;
+      let w = Math.sqrt(turf.area(polygon))/1000;
+      let count = 50 + 10*partitions;
+      let grid_dist = w/Math.sqrt(count);
+      let grid = turf.pointGrid(polygonbbox,grid_dist,{'mask':polygon});
+      //more random! (prevents ugly vertical or horizontal partitions)
+      grid.features.forEach(f=>{f.geometry.coordinates=f.geometry.coordinates.map(c=>c+=Math.random()*0.000002-0.000001);});
+      let clustered = turf.clustersKmeans(
+        grid,
+        {'numberOfClusters':partitions,'mutate':true}
+      );
+      let centroids = [];
+      for (var i = 0; i < divisions; i++) {
+        centroids.push(
+          turf.centroid(
+            turf.getCluster(clustered, {cluster: i})
+          )
+        );
+      }
+      var voronoi = turf.voronoi(
+        turf.featureCollection(centroids),
+        {'bbox':polygonbbox}
+      );
+      this.splitPlot_memo[memo_id] = voronoi.features.map(vc=>{
+        var mask = turf.mask(vc,turf.bboxPolygon(polygonbbox));
+        var c = turf.difference(polygon,mask);
+        return c
+      });
+      return this.splitPlot_memo[memo_id][index];
+    }
+    
+    layout_width(median_block_length,number_of_plots){
+      let bllen = median_block_length;
+      let squarelen = Math.round(Math.sqrt(number_of_plots));
+      let lyt_width;
+      if(squarelen==bllen){
+        lyt_width = squarelen;
+      }
+      else if (squarelen>bllen) {
+        lyt_width = Math.round(squarelen/bllen)*bllen;
+      }
+      else {
+        let closest_up = (bllen%squarelen)/Math.floor(bllen/squarelen);
+        let closest_down = (squarelen-bllen%squarelen)/Math.ceil(bllen/squarelen);
+        lyt_width = Math.round(
+          closest_up<=closest_down? 
+            squarelen+closest_up: 
+            squarelen-closest_down
+        );
+      }
+      return lyt_width;
+    }
+    
+    load_ObsUnits(){
+      this.new_data = true;
+      this.data_parsed = 0;
+      this.data_total = 0;
+      if(this.data && this.data_parsed!=this.data_total){
+        this.data.reject("New Load Started");
+      }
+      var rej;
+      var rawdata = new Promise((resolve,reject)=>{
+        var brapi = BrAPI(this.brapi_endpoint,this.opts.brapi_auth,"1.2");
+        var results = {'plots':[],'plants':[]};
+        brapi.phenotypes_search({
+            "studyDbIds":[this.studyDbId],
+            'pageSize':this.opts.brapi_pageSize
+          })
+          .each(ou=>{
+            ou.X = parseFloat(ou.X);
+            ou.Y = parseFloat(ou.Y);
+            if(ou.observationLevel=="plot") results.plots.push(ou);
+            if(ou.observationLevel=="plant") results.plants.push(ou);
+            this.data_parsed+=1;
+            this.data_total = ou.__response.metadata.pagination.totalCount;
+          })
+          .all(()=>{
+            // ensure unique
+            var plot_map = {};
+            results.plots = results.plots.reduce((acc,plot)=>{
+              if(!plot_map[plot.observationUnitDbId]){
+                plot_map[plot.observationUnitDbId] = plot;
+                acc.push(plot);
+              }
+              return acc;
+            },[]);
+            var plant_map = {};
+            results.plants = results.plants.reduce((acc,plant)=>{
+              if(!plant_map[plant.observationUnitDbId]){
+                plant_map[plant.observationUnitDbId] = plant;
+                acc.push(plant);
+              }
+              return acc;
+            },[]);
+            
+            // sort
+            results.plots.sort(function(a,b){
+              if(a.blockNumber!=b.blockNumber){
+                return parseFloat(a.blockNumber)>parseFloat(b.blockNumber)?1:-1;
+              }
+              if(a.replicate!=b.replicate){
+                return parseFloat(a.replicate)>parseFloat(b.replicate)?1:-1;
+              }
+              if(a.plotNumber!=b.plotNumber){
+                return parseFloat(a.plotNumber)>parseFloat(b.plotNumber)?1:-1
+              }
+              return 1;
+            });
+            results.plants.sort(function(a,b){
+              if(a.plantNumber!=b.plantNumber){
+                return parseFloat(a.plantNumber)>parseFloat(b.plantNumber)?1:-1
+              }
+            });
+            
+            if(results.plots.length>0){
+              results.blocks = d3.nest().key(plot=>plot.blockNumber).entries(results.plots);
+              results.reps = d3.nest().key(plot=>plot.replicate).entries(results.plots);
+            }
+            else {
+              results.blocks = d3.nest().key(plant=>plant.blockNumber).entries(results.plants);
+              results.reps = d3.nest().key(plant=>plant.replicate).entries(results.plants);
+            }
+            
+            clearInterval(this.data.while_downloading);
+            resolve(results);
+          });
+      });
+      this.data = rawdata.then((d)=>this.shape(d))
+        .then((d)=>this.parseTraits(d))
+        .then(d=>this.traitColor(d));
+      this.data.then(d=>console.log("loaded",d));
+      this.data.reject = rej;
+      this.data.while_downloading = setInterval(()=>{
+        var status = this.data_parsed+"/"+this.data_total;
+        console.log(status);
+      },500);
+      rawdata.catch(e=>{
+        clearInterval(this.data.while_downloading);
+        console.log(e);
+      });
     }
   }
+   defaultPlot(HeatMap);
 
   return HeatMap;
 

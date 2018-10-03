@@ -32,7 +32,7 @@
   },
   "scripts": {
     "prepare": "mkdir -p dist && rollup -c && cp -f css/BrAPIHeatMap.css dist/BrAPIHeatMap.css",
-    "rollup-example": "mkdir -p docs && cp dist/* docs/ && cp node_modules/@solgenomics/brapijs/build/BrAPI.js docs/ && cp node_modules/@turf/turf/turf.js docs/ && cp node_modules/d3/dist/d3.js docs/ && cp node_modules/leaflet/dist/leaflet.js docs/ && cp node_modules/leaflet/dist/leaflet.css docs/",
+    "rollup-example": "mkdir -p docs && cp dist/* docs/ && cp node_modules/@solgenomics/brapijs/build/BrAPI.js docs/ && cp node_modules/@turf/turf/turf.js docs/ && cp node_modules/d3/dist/d3.js docs/ && cp node_modules/leaflet/dist/leaflet.js docs/ && cp node_modules/leaflet/dist/leaflet.css docs/ && cp lib/L.CanvasLayer.js docs/",
     "prepublishOnly": "npm run rollup-example && wrapbrapp"
   },
   "brapp": {
