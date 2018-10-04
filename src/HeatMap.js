@@ -9,13 +9,14 @@ const DEFAULT_OPTS = {
   defaultPos: [-39.0863,-12.6773],
   gridSize: 500,
   defaultPlotWidth: 0.002,
+  showNames:true,
+  showBlocks:true,
+  showReps:true
 }
 
 export default class HeatMap {
-  constructor(map_container,controls_container,brapi_endpoint,studyDbId,opts) {
+  constructor(map_container,brapi_endpoint,studyDbId,opts) {
     this.map_container = d3.select(map_container);
-    this.controls = {};
-    this.controls.container = d3.select(controls_container);
     this.brapi_endpoint = brapi_endpoint;
     this.studyDbId = studyDbId;
     
@@ -25,10 +26,7 @@ export default class HeatMap {
     // Set up Leaflet Map
     this.map = L.map(
       this.map_container.node(),
-      {
-        zoomSnap:0.1,
-        zoom: 17
-      }
+      {zoomSnap:0.1}
     );
     
     // Load Data
@@ -38,6 +36,16 @@ export default class HeatMap {
     this.canvLayer = L.canvasLayer()
       .delegate(this)
       .addTo(this.map);
+    
+    this.overlay = this.map_container.append("canvas")
+      .attr("width",250)
+      .attr("height",50)
+      .style("top","10px")
+      .style("left","40px")
+      .style("position","absolute")
+      .style("z-index",1000)
+      .style("pointer-events","none");
+    
   }
   
   onDrawLayer(info) {
@@ -46,32 +54,51 @@ export default class HeatMap {
     let transform = d3.geoTransform({point: function(x,y){
       var point = info.layer._map.latLngToContainerPoint([y, x]);
       this.stream.point(point.x,point.y);
-    }})
+    }});
     let geoPath = d3.geoPath().context(ctx).projection(transform);
+    let layerP = (coords)=>{
+      let p = info.layer._map.containerPointToLayerPoint(coords)
+      return [p.x,p.y]
+    };
     this.data.then(d=>{
       ctx.clearRect(0, 0, info.canvas.width, info.canvas.height);
       ctx.textBaseline = "middle";
       ctx.textAlign = "center";
-      d.plots.forEach(plot=>{
-        ctx.fillStyle = plot.fillColor;
+      (this.opts.observationLevel=="plant"?d.plants:d.plots).forEach(ou=>{
+        ctx.fillStyle = ou.fillColor;
         ctx.lineWidth = 1;
         ctx.beginPath();
-        geoPath(plot.geoJSON);
+        geoPath(ou.geoJSON);
         ctx.fill();
-        ctx.fillStyle = plot.textColor;
-        var fontSize = Math.sqrt(geoPath.area(plot.geoJSON))/5;
+        var fontSize = Math.sqrt(geoPath.area(ou.geoJSON))/5;
+        let textfill = d3.color(ou.textColor);
+        textfill.opacity = fontSize>10?1:Math.pow(fontSize/10,2);
+        ctx.fillStyle = textfill;
         ctx.font = fontSize+'px monospace';
-        var centroid = geoPath.centroid(plot.geoJSON);
-        ctx.fillText(plot.plotNumber, centroid[0], centroid[1]);
+        var centroid = geoPath.centroid(ou.geoJSON);
+        if(this.opts.showNames) ctx.fillText(
+          ou.plotNumber+(ou.plantNumber?":"+ou.plantNumber:""), 
+          centroid[0], 
+          centroid[1]
+        );
       });
-      d.reps.forEach(rep=>{
+      if(this.opts.observationLevel=="plant"){
+        d.plots.forEach(ou=>{
+          ctx.strokeStyle = "#888";
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          geoPath(ou.geoJSON);
+          ctx.stroke();
+        });
+      }
+      if(this.opts.showReps) d.reps.forEach(rep=>{
         ctx.strokeStyle = "blue";
         ctx.lineWidth = 4;
         ctx.beginPath();
         geoPath(rep.geoJSON);
         ctx.stroke();
       })
-      d.blocks.forEach(block=>{
+      if(this.opts.showBlocks) d.blocks.forEach(block=>{
         ctx.strokeStyle = "white";
         ctx.lineWidth = 2;
         ctx.beginPath();
@@ -82,20 +109,75 @@ export default class HeatMap {
   }
   
   traitColor(data){
-    let colorScale;
-    if(!data.plot_traits[this.opts.trait]) colorScale = ()=>"transparent";
-    else colorScale = d3.scaleSequential(d3.interpolateMagma).domain([
-      data.plot_traits[this.opts.trait].min,
-      data.plot_traits[this.opts.trait].max
+    let ou_traits,ous;
+    if(this.opts.observationLevel=="plant"){
+      ou_traits = data.plant_traits
+      ous = data.plants
+    }
+    else {
+      ou_traits = data.plot_traits
+      ous = data.plots
+    }
+    if(!ou_traits[this.opts.trait]) this.colorScale = ()=>"transparent";
+    else this.colorScale = d3.scaleSequential(d3.interpolateMagma).domain([
+      ou_traits[this.opts.trait].min,
+      ou_traits[this.opts.trait].max
     ]);
-    data.plots.forEach(plot=>{
-      let tObs = plot.observations.filter(obs=>obs.observationVariableDbId==this.opts.trait);
+    ous.forEach(ou=>{
+      let tObs = ou.observations.filter(obs=>obs.observationVariableDbId==this.opts.trait);
       let avg = d3.mean(tObs,obs=>obs.value);
-      let c = d3.color(colorScale(avg));
-      if(c) c.opacity = 0.7;
-      plot.fillColor = tObs.length>0?c:"transparent";
-      plot.textColor = this.goodContrast(plot.fillColor);
+      let c = !isNaN(avg) ? d3.color(this.colorScale(avg)) : "transparent";
+      if(c!="transparent") c.opacity = 0.7;
+      ou.fillColor = c;
+      ou.textColor = this.goodContrast(ou.fillColor);
     })
+    
+    var octx = this.overlay.node().getContext('2d');
+    octx.clearRect(0, 0, 400, 400);
+    let scale = {
+      x:10,
+      y:2,
+      width:200,
+      height:16,
+      padding:1,
+      text:10,
+      d:4
+    }
+    if(ou_traits[this.opts.trait]){
+      
+      let bgcol = d3.color("black");
+      bgcol.opacity = 0.8;
+      octx.fillStyle = bgcol;   
+      octx.lineWidth = 0;
+      octx.beginPath();
+      octx.rect(scale.x,scale.y,scale.width,scale.y+scale.height+scale.padding*2+scale.text);
+      octx.fill();
+      
+      let sd2 = d3.format(".2r")
+      octx.textBaseline = "middle";
+      octx.textAlign = "left";
+      octx.fillStyle = "white";
+      octx.font = '10px monospace';
+      octx.fillText(sd2(ou_traits[this.opts.trait].min), scale.x+scale.text*0.4, scale.y+scale.height+scale.padding+scale.text/2);
+      octx.textAlign = "right";
+      octx.fillText(sd2(ou_traits[this.opts.trait].max), scale.x+scale.width-scale.text*0.4, scale.y+scale.height+scale.padding+scale.text/2);
+      
+      
+      
+      for (var i = 0; i < scale.width; i+=scale.d) {
+        octx.fillStyle = d3.interpolateMagma((i+(scale.d/2))/scale.width);      
+        octx.beginPath();
+        octx.rect(scale.x+i,scale.y,scale.d,scale.height);
+        octx.fill();
+      }
+      
+      octx.beginPath();
+      octx.rect(scale.x,scale.y,scale.width,scale.y+scale.height+scale.padding*2+scale.text);
+      octx.strokeStyle = "white";   
+      octx.lineWidth = 1;
+      octx.stroke();
+    }
+    
     return data;
   }
   
@@ -115,7 +197,7 @@ export default class HeatMap {
   }
   
   getTraits(cb){
-    let out = this.data.then(d=>d3.values(d.plot_traits));
+    let out = this.data.then(d=>d3.values(this.opts.observationLevel=="plant"?d.plant_traits:d.plot_traits));
     if(cb) out.then(cb);
     else return out
   }
@@ -142,8 +224,10 @@ export default class HeatMap {
           };
         }
         let t = data.plant_traits[obs.observationVariableDbId];
-        t.min = Math.min(obs.value,t.min);
-        t.max = Math.max(obs.value,t.max);
+        if(!isNaN(obs.value)){
+          t.min = Math.min(obs.value,t.min);
+          t.max = Math.max(obs.value,t.max);
+        }
       })
     });
     data.plots.forEach(plot=>{
@@ -158,8 +242,10 @@ export default class HeatMap {
           };
         }
         let t = data.plot_traits[obs.observationVariableDbId];
-        t.min = Math.min(obs.value,t.min);
-        t.max = Math.max(obs.value,t.max);
+        if(!isNaN(obs.value)){
+          t.min = Math.min(obs.value,t.min);
+          t.max = Math.max(obs.value,t.max);
+        }
       })
     });
     return data
@@ -204,20 +290,19 @@ export default class HeatMap {
     }
     else{
       // use default plot generator
-      let plot_count = d3.mean(plot_XY_groups,x=>{
-        return x!=undefined?d3.mean(x,xy=>xy!=undefined?xy.length:null):null
-      });
-      let plotArea = plot_count*this.opts.defaultPlotWidth*this.opts.defaultPlotWidth;
-      let plotSize = Math.sqrt(plotArea);
+      // let plot_count = d3.mean(plot_XY_groups,x=>{
+      //   return x!=undefined?d3.mean(x,xy=>xy!=undefined?xy.length:null):null
+      // });
+      // let plotArea = plot_count*this.opts.defaultPlotWidth*this.opts.defaultPlotWidth;
+      // let plotSize = Math.sqrt(plotArea);
       // this.setDefaultPlotSize(Math.sqrt(plotArea));
       for (let X in plot_XY_groups) {
         if (plot_XY_groups.hasOwnProperty(X)) {
           for (let Y in plot_XY_groups[X]) {
             if (plot_XY_groups[X].hasOwnProperty(Y)) {
-              let polygon = this.defaultPlot(Y,X,plotSize);
-              // console.log("p",polygon);
+              let polygon = this.defaultPlot(Y,X,this.opts.defaultPlotWidth);
               plot_XY_groups[X][Y].forEach((plot,i)=>{
-                plot.geoJSON = polygon;//this.splitPlot(polygon,plot_XY_groups[X][Y].length,i);
+                plot.geoJSON = this.splitPlot(polygon,plot_XY_groups[X][Y].length,i);
               })
             }
           }
@@ -253,19 +338,18 @@ export default class HeatMap {
     }
     else{
       // use default plant generator
-      let plant_count = d3.mean(plant_XY_groups,x=>{
-        return x!=undefined?d3.mean(x,xy=>xy!=undefined?xy.length:null):null
-      });
-      let plantArea = plant_count*this.opts.defaultPlotWidth*this.opts.defaultPlotWidth;
-      let plantSize = Math.sqrt(plantArea);
+      // let plant_count = d3.mean(plant_XY_groups,x=>{
+      //   return x!=undefined?d3.mean(x,xy=>xy!=undefined?xy.length:null):null
+      // });
+      // let plantArea = plant_count*this.opts.defaultPlotWidth*this.opts.defaultPlotWidth;
+      // let plantSize = Math.sqrt(plantArea);
       for (let X in plant_XY_groups) {
         if (plant_XY_groups.hasOwnProperty(X)) {
           for (let Y in plant_XY_groups[X]) {
             if (plant_XY_groups[X].hasOwnProperty(Y)) {
-              console.log(Y,X,plantSize);
-              let polygon = this.defaultPlot(Y,X,plantSize);
+              let polygon = this.defaultPlot(Y,X,this.opts.defaultPlotWidth);
               plant_XY_groups[X][Y].forEach((plant,i)=>{
-                plant.geoJSON = polygon;
+                plant.geoJSON = this.splitPlot(polygon,plant_XY_groups[X][Y].length,i);
               })
             }
           }
@@ -295,38 +379,65 @@ export default class HeatMap {
     if(this.splitPlot_memo[memo_key]) return this.splitPlot_memo[memo_key][index];
     if(!partitions||partitions<2) return (this.splitPlot_memo[memo_key] = [polygon])[index];
     
+    let scale_factor = 50; //prevents rounding errors
+    let scale_origin = turf.getCoord(turf.centroid(polygon));
+    polygon = turf.transformScale(polygon, scale_factor, {'origin':scale_origin});
+    
+    let row_width = Math.ceil(Math.sqrt(partitions));
+    let row_counts = [];
+    for (var i = 0; i < Math.floor(partitions/row_width); i++) {
+      row_counts[i] = row_width
+    }
+    if(partitions%row_width) row_counts[row_counts.length] = partitions%row_width;
+    
     let polygonbbox = turf.bbox(polygon);
     polygonbbox[0]-=0.00001; polygonbbox[1]-=0.00001; polygonbbox[2]+=0.00001; polygonbbox[3]+=0.00001;
     let w = Math.sqrt(turf.area(polygon))/1000;
-    let count = 50 + 10*partitions;
-    let grid_dist = w/Math.sqrt(count);
+    let area = 50+100*partitions;
+    let grid_dist = w/Math.sqrt(area);
     let grid = turf.pointGrid(polygonbbox,grid_dist,{'mask':polygon});
-    //more random! (prevents ugly vertical or horizontal partitions)
-    grid.features.forEach(f=>{f.geometry.coordinates=f.geometry.coordinates.map(c=>c+=Math.random()*0.000002-0.000001)});
-    let clustered = turf.clustersKmeans(
-      grid,
-      {'numberOfClusters':partitions,'mutate':true}
-    );
-    let centroids = [];
-    for (var i = 0; i < divisions; i++) {
-      centroids.push(
-        turf.centroid(
-          turf.getCluster(clustered, {cluster: i})
-        )
-      );
-    }
+    let points = grid.features;
+    
+    let points_per_part = Math.floor(points.length/partitions);
+    
+    let row_point_counts = row_counts.map(rc=>rc*points_per_part);
+    
+    points = points.sort((b,a)=>d3.ascending(turf.getCoord(a)[1],turf.getCoord(b)[1]));
+    
+    let t = 0;
+    let rows = [];
+    row_point_counts.forEach((rpc,i)=>{
+      rows[i] = [];
+      while (rows[i].length<rpc && t<points.length){
+        rows[i].push(points[t++]);
+      }
+    })
+    
+    let collecs = [];
+    rows.forEach((row,ri)=>{
+      row = row.sort((a,b)=>d3.ascending(turf.getCoord(a)[0],turf.getCoord(b)[0]));
+      let p = 0;
+      let c0 = collecs.length;
+      for (var ci = c0; ci < c0+row_counts[ri]; ci++) {
+        collecs[ci] = []
+        while (collecs[ci].length<points_per_part && p<row.length){
+          collecs[ci].push(row[p++]);
+        }
+      }
+    })
+    let centroids = turf.featureCollection(collecs.map(c=>turf.centroid(turf.featureCollection(c))));
     var voronoi = turf.voronoi(
-      turf.featureCollection(centroids),
+      centroids,
       {'bbox':polygonbbox}
-    )
-    this.splitPlot_memo[memo_id] = voronoi.features.map(vc=>{
+    );
+    this.splitPlot_memo[memo_key] = voronoi.features.map(vc=>{
       var a = vc;
       var b = polygon;
       var mask = turf.mask(vc,turf.bboxPolygon(polygonbbox));
       var c = turf.difference(polygon,mask);
-      return c
+      return turf.transformScale(c, 1/scale_factor, {'origin':scale_origin})
     });
-    return this.splitPlot_memo[memo_id][index];
+    return this.splitPlot_memo[memo_key][index];
   }
   
   layout_width(median_block_length,number_of_plots){
