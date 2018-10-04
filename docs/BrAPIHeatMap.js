@@ -169,7 +169,7 @@
         });
         if(this.opts.observationLevel=="plant"){
           d.plots.forEach(ou=>{
-            ctx.strokeStyle = "black";
+            ctx.strokeStyle = "#888";
             ctx.lineWidth = 1;
             ctx.beginPath();
             geoPath(ou.geoJSON);
