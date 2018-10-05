@@ -1,24 +1,30 @@
-<link rel="stylesheet" property="stylesheet" href="/css/HeatMap.css" />
-<link rel="stylesheet" property="stylesheet" href="https://cdn.datatables.net/1.10.16/css/jquery.dataTables.min.css">
-<form id="brapi-form" action="#"  class="form-inline" style="margin:1em">
-    <div class="form-group">
-        <label for="brapi-server">BrAPI Server Adress</label>
-        <input type="text" class="form-control" id="brapi-server" name="server" value="yambase.org">
-    </div>
-    <div class="form-group">
-        <label for="brapi-username">Username</label>
-        <input type="text" class="form-control" id="brapi-username" name="username" placeholder="John_Doe">
-    </div>
-    <div class="form-group">
-        <label for="brapi-password">Password</label>
-        <input type="password" class="form-control" id="brapi-password" name="password" placeholder="••••••••••••">
-    </div>
-    <br>
-    <br>
-    <div class="form-group">
-        <label for="brapi-study">Study ID</label>
-        <input type="text" class="form-control" id="brapi-study" name="study" value="20">
-    </div>
-    
-    <input type="submit" action="#" id="load-brapi" class="btn btn-primary" value="Load"/>
+<link rel="stylesheet" href="example_files/leaflet.css" />
+<form class="form-inline" style="padding:10px;">
+  <div class="form-group">
+    <label for="endpoint">BrAPI Base URL</label>
+    <input type="text" class="form-control" name="endpoint" value="https://cassavabase.org/brapi/v1">
+  </div>
+  <div class="form-group">
+    <label for="studyDbId">Study ID</label>
+    <input type="text" class="form-control" name="studyDbId" value="3086">
+  </div>
+  <a id="build-heatmap-submit" class="btn btn-default">Build Heatmap</a>
 </form>
+<br>
+<form class="form-inline">
+  <select id="level_select" class="form-control">
+    <option value="plot">Plot</option>
+    <option value="plant">Plant</option>
+  </select>
+  <select id="trait_select" class="form-control">
+    <option disabled selected>Select a Trait</option>
+  </select>
+</form>
+<!-- 
+// 4015 plots,positions
+// 3443 plots,positions,smaller,duplicated
+// 1828
+// 1649
+// 2812
+// 1953 plants 
+-->

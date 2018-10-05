@@ -1,122 +1,54 @@
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/4.12.0/d3.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.3.7/js/bootstrap.min.js"></script>
-<script src="https://cdn.datatables.net/1.10.16/js/jquery.dataTables.min.js" charset="utf-8"></script>
-<script src="BrAPI.js"></script>
-<script src="HeatMap.js" charset="utf-8"></script>
+<script src="example_files/leaflet.js"></script>
+<script src="example_files/d3.js"></script>
+<script src="example_files/turf.js"></script>
+<script src="example_files/BrAPI.js"></script>
+<script src="example_files/BrAPIHeatMap.js" charset="utf-8"></script>
 <script type="text/javascript">
-    $(document).ready(function() {
-        var run = false;
-        $("#brapi-form").submit(function() {
-            if (run) {
-                $("#filtered_results").DataTable().destroy();
-                $("#filtered_results").html("");
-                
-                
-                jQuery("#trait_heatmap").css("display", "none");
-                
-                field_map_view();
-                jQuery.ajax ( {
-                    url: '/brapi/v1/studies/'+trial_id+'/observationvariables',
-                    //url : '/ajax/breeders/trial/'+ <% $trial_id %> + '/traits_assayed?stock_type='+value,
-                    beforeSend: function() {
-                      jQuery("#working_modal").modal("show");
-                    },
-                    success: function(response){
-                        var data = response.result.data;
-                        var varName = [];
-                        var varID = [];
-                        jQuery.each(data, function(key_obj, value_obj) {
-                            jQuery.each(value_obj, function(key, value) {
-                                if (key == 'name'){
-                                    varName.push(value);
-                                }
-                                if (key == 'observationVariableDbId'){
-                                    varID.push(value);
-                                }
-                            });
-                        });
+    var myHeatMap;
+    d3.select("#build-heatmap-submit").on("click",()=>{
+        d3.event.stopPropagation()
+        d3.select("#map").html("");
+        d3.select("#map_controls").html("");
+        if(myHeatMap) myHeatMap.map.remove();
 
-                        if (varName != '' && varID != '' ) {
-                            var traits_assayed_html = "<select class='form-control' id='trait_list_dropdown'>";
-                            traits_assayed_html = traits_assayed_html + "<optgroup label='Field Map'>";
-                            traits_assayed_html = traits_assayed_html + "<option value='fieldmap'>view field layout</option></optgroup>";
-                            traits_assayed_html = traits_assayed_html + "<optgroup label='Assayed Traits'>";
-                            for (i=0; i<varID.length; i++) {
-                                traits_assayed_html = traits_assayed_html + "<option value="+ varID[i] + " >" + varName[i] + "</option>";
-                            }
-                            traits_assayed_html = traits_assayed_html +"</optgroup>";
-                            traits_assayed_html = traits_assayed_html +"</select>";
-                            jQuery("#trait_heatmap").css("display", "none");                   
-                            jQuery("#heatmap_traits_assayed_dropdown").html(traits_assayed_html);
-                            jQuery("#traitdiv").css("display", "inline-block");
-                        } 
-                        else {
-                            var traits_assayed_html = "<select class='form-control' id='trait_list_dropdown'>";
-                            traits_assayed_html = traits_assayed_html + "<optgroup label='Field Map'>";
-                            traits_assayed_html = traits_assayed_html + "<option value='fieldmap'>view field layout</option></optgroup>";
-                            traits_assayed_html = traits_assayed_html + "<optgroup label='Assayed Traits'>";
-                            traits_assayed_html = traits_assayed_html +"</optgroup>";
-                            traits_assayed_html = traits_assayed_html +"</select>";
-                            jQuery("#trait_heatmap").css("display", "none");                   
-                            jQuery("#heatmap_traits_assayed_dropdown").html(traits_assayed_html);
-                            jQuery("#traitdiv").css("display", "inline-block");               
-                        }
-                    },
-                    error: function(response){
-                        alert('Error retrieving traits assayed in this trial');
-                    }
-                }); 
-                
-                
-                
-            }
-            run = true;
-            var form = $(this).serializeArray().reduce(function(vals, entry) {
-                vals[entry.name] = entry.value
-                return vals
-            }, {});
-            var base_url = form.server;
-            if (base_url.slice(0, 8) != "https://" && base_url.slice(0, 7) != "http://") {
-                base_url = "https://" + base_url;
-            }
-            if (base_url.slice(-1) != "/") {
-                base_url += "/";
-            }
-            var auth = form.username ? {
-                'username': form.username,
-                'password': form.password
-            } : undefined;
-            var brapi = BrAPI(base_url + "brapi/v1", auth);
-            var params = {
-                "studyDbIds": [form.study],
-            };
-            GraphicalFilter(
-                brapi.phenotypes_search(params),
-                function(d) { // traits/values
-                    var traits = {}
-                    d.observations.forEach(function(obs){
-                          traits[obs.observationVariableName] = obs.value;
-                    });
-                    return traits;
-                },
-                form.group? function(d) {
-                    return {
-                        'Accession':d.germplasmName
-                    }
-                } : function(d) { // header columns accessor
-                    return {
-                        'Study':d.studyName,
-                        'Unit':d.observationUnitName,
-                        'Accession':d.germplasmName,
-                    }
-                },
-                form.group? ["Accession"] : ["Study","Unit","Accession"], // header column order
-                form.group? function(d) { // groupBy function
-                    return d.germplasmDbId
-                } : undefined
-            ).draw("#filter_div","#filtered_results")
-            return false;
+        myHeatMap = new BrAPIHeatMap("#map",
+            d3.select('[name="endpoint"]').node().value,
+            d3.select('[name="studyDbId"]').node().value,
+            {
+                defaultPos:[-76.43241316080093, 42.44826633248185],
+                observationLevel:d3.select("#level_select").node().value,
+                defaultPlotWidth: 0.002,
+        });
+
+        L.tileLayer('http://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{
+            attribution: '&copy; <a href="http://www.esri.com/">Esri</a>, DigitalGlobe, GeoEye, i-cubed, USDA FSA, USGS, AEX, Getmapping, Aerogrid, IGN, IGP, swisstopo, and the GIS User Community',
+            maxZoom: 28,
+            maxNativeZoom: 19
+        }).addTo(myHeatMap.map);
+        
+        let trait_select = () => myHeatMap.getTraits().then(traits=>{
+            d3.select("#trait_select").select("option[disabled]").attr("selected",'').attr('value', '');
+            let opts = d3.select("#trait_select").selectAll("option:not([disabled])")
+                .data(traits);
+            opts.exit().remove();
+            opts.enter().append("option")
+                .merge(opts)
+                .text(t=>t.name)
+                .attr("selected",null)
+                .attr("value",t=>t.id);
+            d3.select("#trait_select").on("change",null).on("change",function(){
+                myHeatMap.setTrait(d3.select("#trait_select").node().value);
+            })
+        });
+        
+        trait_select()
+        d3.select("#level_select").on("change",null).on("change",function(){
+            myHeatMap.setLevel(d3.select("#level_select").node().value);
+            myHeatMap.setTrait(null);
+            d3.select('#trait_select').property('value', '');
+            trait_select();
         })
+        
+        return false;
     });
 </script>
