@@ -15,7 +15,6 @@
         this.opts.shape_memo = Array(this.opts.gridSize*this.opts.gridSize);
         this.opts.shape_memo.size = size;
       } 
-      console.log(size);
       if(!this.opts.shape_memo[(row*this.opts.gridSize)+col]){
         var o = turf$1.point(this.opts.defaultPos);
         var tl = turf$1.destination(
@@ -95,13 +94,15 @@
     trait:null, // 76913 76900 76884 76861
     brapi_auth:null,
     brapi_pageSize:1000,
-    defaultPos: [-39.0863,-12.6773],
+    defaultPos: [-76.46823640912771,42.44668396825921],
     gridSize: 500,
     defaultPlotWidth: 0.002,
     showNames:true,
     showBlocks:true,
     showReps:true
   };
+
+  const valFormat = d3.format(".2r");
 
   class HeatMap {
     constructor(map_container,brapi_endpoint,studyDbId,opts) {
@@ -135,9 +136,19 @@
         .style("z-index",1000)
         .style("pointer-events","none");
       
+      this.tooltipSVG = this.map_container.append("svg")
+        .attr("width","100%")
+        .attr("height","100%")
+        .style("top","0px")
+        .style("left","0px")
+        .style("position","absolute")
+        .style("z-index",999)
+        .style("pointer-events","none");
+      
     }
     
     onDrawLayer(info) {
+      console.log(info);
       var ctx = info.canvas.getContext('2d');
       let map = this.map;
       let transform = d3.geoTransform({point: function(x,y){
@@ -145,11 +156,21 @@
         this.stream.point(point.x,point.y);
       }});
       let geoPath = d3.geoPath().context(ctx).projection(transform);
-      this.data.then(d=>{
+      this.data = this.data.then(d=>{
+        
+        var voronoi = d3.voronoi()
+          .x(ou=>geoPath.centroid(ou.geoJSON)[0])
+          .y(ou=>geoPath.centroid(ou.geoJSON)[1]);
+          
+        var ous = this.opts.observationLevel=="plant"?d.plants:d.plots;
+        d.voronoi = voronoi(ous);
+        d.geoPath = geoPath;
+        d3.select(info.canvas).on("mousemove",()=>this.mousemove());
+        
         ctx.clearRect(0, 0, info.canvas.width, info.canvas.height);
         ctx.textBaseline = "middle";
         ctx.textAlign = "center";
-        (this.opts.observationLevel=="plant"?d.plants:d.plots).forEach(ou=>{
+        ous.forEach(ou=>{
           ctx.fillStyle = ou.fillColor;
           ctx.lineWidth = 1;
           ctx.beginPath();
@@ -167,15 +188,13 @@
             centroid[1]
           );
         });
-        if(this.opts.observationLevel=="plant"){
-          d.plots.forEach(ou=>{
-            ctx.strokeStyle = "#888";
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            geoPath(ou.geoJSON);
-            ctx.stroke();
-          });
-        }
+        d.plots.forEach(ou=>{
+          ctx.strokeStyle = "#888";
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          geoPath(ou.geoJSON);
+          ctx.stroke();
+        });
         if(this.opts.showReps) d.reps.forEach(rep=>{
           ctx.strokeStyle = "blue";
           ctx.lineWidth = 4;
@@ -190,6 +209,69 @@
           geoPath(block.geoJSON);
           ctx.stroke();
         });
+        return d;
+      });
+    }
+    
+    mousemove(){
+      var mx = d3.event.layerX;
+      var my = d3.event.layerY;
+      this.data.then(d=>{
+        var site = d.voronoi.find(mx,my);
+        var data = [site.data];
+        if(site){
+          var centroid = d.geoPath.centroid(site.data.geoJSON);
+          var dist = Math.sqrt(d3.sum([mx-centroid[0],my-centroid[1]],d=>d*d));
+          if(dist>Math.sqrt(d.geoPath.area(site.data.geoJSON))/2+5){
+            data = [];
+          }
+        }
+        else data = [];
+        
+        var tt = this.tooltipSVG.selectAll(".HeatMap_ToolTip").data(data);
+        tt.exit().remove();
+        var ntt = tt.enter().append("g")
+          .attr("opacity","0.8")
+          .classed("HeatMap_ToolTip",true);
+        ntt.append("rect")
+          .attr("stroke-width","1px")
+          .attr("stroke","white")
+          .attr("width",100)
+          .attr("height",100);
+        ntt.append("g");
+        
+        var tooltip = tt.merge(ntt);
+        var tooltiptext = tooltip.select("g").selectAll("text")
+          .data(ou=>{ 
+            var val = valFormat(d3.mean(ou.observations.filter(obs=>obs.observationVariableDbId==this.opts.trait),obs=>obs.value));
+            return [
+            `    Value: ${isNaN(val)?"???":val}`,
+            `Germplasm: ${ou.germplasmName}`,
+            `Replicate: ${ou.replicate}`,
+            `    Block: ${ou.blockNumber}`,
+            `  Row,Col: ${ou.Y},${ou.X}`,
+            `   Plot #: ${ou.plotNumber}`
+          ].concat(this.opts.observationLevel=="plant"?[`  Plant #: ${ou.plantNumber}`]:[])
+        });
+        tooltiptext.exit().remove;
+        tooltiptext.enter().append("text")
+          .attr("x",10)
+          .attr("y",(t,i)=>10*(i)+2)
+          .attr("font-family","monospace")
+          .attr("font-size","10px")
+          .attr("fill","white")
+          .merge(tooltiptext)
+          .text(t=>t.replace(/\s/g,"\xa0"));
+        tooltip.select("rect")
+          .attr("width",function(){return d3.select(this.parentNode).select("g").node().getBBox().width+4})
+          .attr("height",function(){return d3.select(this.parentNode).select("g").node().getBBox().height+2})
+          .attr("x",function(){return d3.select(this.parentNode).select("g").node().getBBox().x-2})
+          .attr("y",function(){return d3.select(this.parentNode).select("g").node().getBBox().y-1});
+        tooltip.attr("transform",function(ou){
+            var bounds = d.geoPath.bounds(ou.geoJSON);
+            var bbox = this.getBBox();
+            return `translate(${(bounds[0][0]+bounds[1][0])/2-bbox.width/2},${bounds[0][1]-bbox.height})`
+          });
       });
     }
     
@@ -238,14 +320,13 @@
         octx.rect(scale.x,scale.y,scale.width,scale.y+scale.height+scale.padding*2+scale.text);
         octx.fill();
         
-        let sd2 = d3.format(".2r");
         octx.textBaseline = "middle";
         octx.textAlign = "left";
         octx.fillStyle = "white";
         octx.font = '10px monospace';
-        octx.fillText(sd2(ou_traits[this.opts.trait].min), scale.x+scale.text*0.4, scale.y+scale.height+scale.padding+scale.text/2);
+        octx.fillText(valFormat(ou_traits[this.opts.trait].min), scale.x+scale.text*0.4, scale.y+scale.height+scale.padding+scale.text/2);
         octx.textAlign = "right";
-        octx.fillText(sd2(ou_traits[this.opts.trait].max), scale.x+scale.width-scale.text*0.4, scale.y+scale.height+scale.padding+scale.text/2);
+        octx.fillText(valFormat(ou_traits[this.opts.trait].max), scale.x+scale.width-scale.text*0.4, scale.y+scale.height+scale.padding+scale.text/2);
         
         
         
@@ -288,7 +369,6 @@
     }
     
     setTrait(tId){
-      console.log(tId,typeof tId);
       this.opts.trait = tId;
       this.data = this.data.then(d=>this.traitColor(d));
       this.canvLayer.drawLayer();

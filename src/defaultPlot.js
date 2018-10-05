@@ -7,7 +7,6 @@ export default function(HeatMap){
       this.opts.shape_memo = Array(this.opts.gridSize*this.opts.gridSize);
       this.opts.shape_memo.size = size;
     } 
-    console.log(size);
     if(!this.opts.shape_memo[(row*this.opts.gridSize)+col]){
       var o = turf.point(this.opts.defaultPos);
       var tl = turf.destination(
