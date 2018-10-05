@@ -1,9 +1,11 @@
 import d3 from "d3";
 import L from "leaflet";
 
+import "../lib/L.CanvasLayer.js";
+import applyDefaultPlot from './defaultPlot.js'; 
+
 const DEFAULT_OPTS = {
   observationLevel:"plot",
-  trait:null, // 76913 76900 76884 76861
   brapi_auth:null,
   brapi_pageSize:1000,
   defaultPos: [-76.46823640912771,42.44668396825921],
@@ -11,14 +13,16 @@ const DEFAULT_OPTS = {
   defaultPlotWidth: 0.002,
   showNames:true,
   showBlocks:true,
-  showReps:true
+  showReps:true,
+  onClick:()=>{}
 }
 
-const valFormat = d3.format(".2r")
+const valFormat = d3.format(".2r");
 
 export default class HeatMap {
   constructor(map_container,brapi_endpoint,studyDbId,opts) {
-    this.map_container = d3.select(map_container);
+    this.map_container = d3.select(map_container)
+      .style("background-color","#888");
     this.brapi_endpoint = brapi_endpoint;
     this.studyDbId = studyDbId;
     
@@ -60,7 +64,6 @@ export default class HeatMap {
   }
   
   onDrawLayer(info) {
-    console.log(info);
     var ctx = info.canvas.getContext('2d');
     let map = this.map;
     let transform = d3.geoTransform({point: function(x,y){
@@ -105,7 +108,7 @@ export default class HeatMap {
         );
       });
       d.plots.forEach(ou=>{
-        ctx.strokeStyle = "#888";
+        ctx.strokeStyle = "#444";
         ctx.lineWidth = 1;
         ctx.beginPath();
         geoPath(ou.geoJSON);
@@ -290,6 +293,17 @@ export default class HeatMap {
     this.canvLayer.drawLayer();
   }
   
+  eachObservationUnit(tId,mutator,reshape){
+    this.data = this.data.then(d=>{
+      d.plots.concat(d.plants).forEach(ou=>mutator(ou));
+      return d;
+    })
+    if(reshape) this.data = this.data.then((d)=>this.shape(d));
+    this.data = this.data.then((d)=>this.parseTraits(d))
+      .then(d=>this.traitColor(d));
+    this.canvLayer.drawLayer();
+  }
+  
   parseTraits(data){
     data.plot_traits = {};
     data.plant_traits = {};
@@ -440,10 +454,10 @@ export default class HeatMap {
     
     // Has geoJSON
     data.blocks.forEach(block=>{
-      block.geoJSON = turf.union(...block.values.map(ou=>turf.truncate(ou.geoJSON)));
+      block.geoJSON = turf.union(...block.values.map(ou=>turf.truncate(ou.geoJSON,{'precision':7})));
     });
     data.reps.forEach(rep=>{
-      rep.geoJSON = turf.union(...rep.values.map(ou=>turf.truncate(ou.geoJSON)));
+      rep.geoJSON = turf.union(...rep.values.map(ou=>turf.truncate(ou.geoJSON,{'precision':7})));
     });
     
     if(this.new_data){
@@ -634,4 +648,4 @@ export default class HeatMap {
   }
 }
 
-import defaultPlot from './defaultPlot.js'; defaultPlot(HeatMap);
+applyDefaultPlot(HeatMap);

@@ -1,9 +1,8 @@
-<script src="leaflet.js"></script>
-<script src="L.CanvasLayer.js"></script>
-<script src="d3.js"></script>
-<script src="turf.js"></script>
-<script src="BrAPI.js"></script>
-<script src="BrAPIHeatMap.js" charset="utf-8"></script>
+<script src="example_files/leaflet.js"></script>
+<script src="example_files/d3.js"></script>
+<script src="example_files/turf.js"></script>
+<script src="example_files/BrAPI.js"></script>
+<script src="example_files/BrAPIHeatMap.js" charset="utf-8"></script>
 <script type="text/javascript">
     var myHeatMap;
     d3.select("#build-heatmap-submit").on("click",()=>{
@@ -11,29 +10,24 @@
         d3.select("#map").html("");
         d3.select("#map_controls").html("");
         if(myHeatMap) myHeatMap.map.remove();
+
         myHeatMap = new BrAPIHeatMap("#map",
             d3.select('[name="endpoint"]').node().value,
             d3.select('[name="studyDbId"]').node().value,
             {
                 defaultPos:[-76.43241316080093, 42.44826633248185],
                 observationLevel:d3.select("#level_select").node().value,
-                draw_controls:true,
-                draw_control_trait:true,
-                draw_control_unit:true,
-                draw_control_rep:true,
-                draw_control_block:true,
-                // showNames:false,
                 defaultPlotWidth: 0.002,
         });
-        console.log("yellow");
-        // L.tileLayer('http://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{
-        //     attribution: '&copy; <a href="http://www.esri.com/">Esri</a>, DigitalGlobe, GeoEye, i-cubed, USDA FSA, USGS, AEX, Getmapping, Aerogrid, IGN, IGP, swisstopo, and the GIS User Community',
-        //     maxZoom: 28,
-        //     maxNativeZoom: 19
-        // }).addTo(myHeatMap.map);
+
+        L.tileLayer('http://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{
+            attribution: '&copy; <a href="http://www.esri.com/">Esri</a>, DigitalGlobe, GeoEye, i-cubed, USDA FSA, USGS, AEX, Getmapping, Aerogrid, IGN, IGP, swisstopo, and the GIS User Community',
+            maxZoom: 28,
+            maxNativeZoom: 19
+        }).addTo(myHeatMap.map);
         
         let trait_select = () => myHeatMap.getTraits().then(traits=>{
-            d3.select("#trait_select").select("option[disabled]").attr("selected",'');
+            d3.select("#trait_select").select("option[disabled]").attr("selected",'').attr('value', '');
             let opts = d3.select("#trait_select").selectAll("option:not([disabled])")
                 .data(traits);
             opts.exit().remove();
@@ -50,6 +44,8 @@
         trait_select()
         d3.select("#level_select").on("change",null).on("change",function(){
             myHeatMap.setLevel(d3.select("#level_select").node().value);
+            myHeatMap.setTrait(null);
+            d3.select('#trait_select').property('value', '');
             trait_select();
         })
         

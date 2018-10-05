@@ -8,7 +8,177 @@
   d3 = d3 && d3.hasOwnProperty('default') ? d3['default'] : d3;
   L = L && L.hasOwnProperty('default') ? L['default'] : L;
 
-  function defaultPlot(HeatMap){  
+  /*
+   Modified to explicitly change window.L
+  */
+
+  /*
+    Generic  Canvas Layer for leaflet 0.7 and 1.0-rc, 
+    copyright Stanislav Sumbera,  2016 , sumbera.com , license MIT
+    originally created and motivated by window.L.CanvasOverlay  available here: https://gist.github.com/Sumbera/11114288  
+    
+  */
+
+  // -- window.L.DomUtil.setTransform from leaflet 1.0.0 to work on 0.0.7
+  //------------------------------------------------------------------------------
+  window.L.DomUtil.setTransform = window.L.DomUtil.setTransform || function (el, offset, scale) {
+      var pos = offset || new window.L.Point(0, 0);
+
+      el.style[window.L.DomUtil.TRANSFORM] =
+          (window.L.Browser.ie3d ?
+              'translate(' + pos.x + 'px,' + pos.y + 'px)' :
+              'translate3d(' + pos.x + 'px,' + pos.y + 'px,0)') +
+          (scale ? ' scale(' + scale + ')' : '');
+  };
+
+  // -- support for both  0.0.7 and 1.0.0 rc2 leaflet
+  window.L.CanvasLayer = (window.L.Layer ? window.L.Layer : window.L.Class).extend({ 
+      // -- initialized is called on prototype 
+      initialize: function (options) {
+          this._map    = null;
+          this._canvas = null;
+          this._frame  = null;
+          this._delegate = null;
+          window.L.setOptions(this, options);
+      },
+
+      delegate :function(del){
+          this._delegate = del;
+          return this;
+      },
+
+      needRedraw: function () {
+          if (!this._frame) {
+              this._frame = window.L.Util.requestAnimFrame(this.drawLayer, this);
+          }
+          return this;
+      },
+      
+      //-------------------------------------------------------------
+      _onLayerDidResize: function (resizeEvent) {
+          this._canvas.width = resizeEvent.newSize.x;
+          this._canvas.height = resizeEvent.newSize.y;
+      },
+      //-------------------------------------------------------------
+      _onLayerDidMove: function () {
+          var topLeft = this._map.containerPointToLayerPoint([0, 0]);
+          window.L.DomUtil.setPosition(this._canvas, topLeft);
+          this.drawLayer();
+      },
+      //-------------------------------------------------------------
+      getEvents: function () {
+          var events = {
+              resize: this._onLayerDidResize,
+              moveend: this._onLayerDidMove
+          };
+          if (this._map.options.zoomAnimation && window.L.Browser.any3d) {
+              events.zoomanim =  this._animateZoom;
+          }
+
+          return events;
+      },
+      //-------------------------------------------------------------
+      onAdd: function (map) {
+          this._map = map;
+          this._canvas = window.L.DomUtil.create('canvas', 'leaflet-layer');
+          this.tiles = {};
+
+          var size = this._map.getSize();
+          this._canvas.width = size.x;
+          this._canvas.height = size.y;
+
+          var animated = this._map.options.zoomAnimation && window.L.Browser.any3d;
+          window.L.DomUtil.addClass(this._canvas, 'leaflet-zoom-' + (animated ? 'animated' : 'hide'));
+
+
+          map._panes.overlayPane.appendChild(this._canvas);
+
+          map.on(this.getEvents(),this);
+          
+          var del = this._delegate || this;
+          del.onLayerDidMount && del.onLayerDidMount(); // -- callback
+          this.needRedraw();
+      },
+      
+      //-------------------------------------------------------------
+      onRemove: function (map) {
+          var del = this._delegate || this;
+          del.onLayerWillUnmount && del.onLayerWillUnmount(); // -- callback
+     
+
+          map.getPanes().overlayPane.removeChild(this._canvas);
+   
+          map.off(this.getEvents(),this);
+          
+          this._canvas = null;
+
+      },
+
+      //------------------------------------------------------------
+      addTo: function (map) {
+          map.addLayer(this);
+          return this;
+      },
+      // --------------------------------------------------------------------------------
+      LatLonToMercator: function (latlon) {
+          return {
+              x: latlon.lng * 6378137 * Math.PI / 180,
+              y: Math.log(Math.tan((90 + latlon.lat) * Math.PI / 360)) * 6378137
+          };
+      },
+
+      //------------------------------------------------------------------------------
+      drawLayer: function () {
+          // -- todo make the viewInfo properties  flat objects.
+          var size   = this._map.getSize();
+          var bounds = this._map.getBounds();
+          var zoom   = this._map.getZoom();
+
+          var center = this.LatLonToMercator(this._map.getCenter());
+          var corner = this.LatLonToMercator(this._map.containerPointToLatLng(this._map.getSize()));
+     
+          var del = this._delegate || this;
+          del.onDrawLayer && del.onDrawLayer( {
+                                                  layer : this,
+                                                  canvas: this._canvas,
+                                                  bounds: bounds,
+                                                  size: size,
+                                                  zoom: zoom,
+                                                  center : center,
+                                                  corner : corner
+                                              });
+          this._frame = null;
+      },
+      // -- window.L.DomUtil.setTransform from leaflet 1.0.0 to work on 0.0.7
+      //------------------------------------------------------------------------------
+      _setTransform: function (el, offset, scale) {
+          var pos = offset || new window.L.Point(0, 0);
+
+          el.style[window.L.DomUtil.TRANSFORM] =
+  			(window.L.Browser.ie3d ?
+  				'translate(' + pos.x + 'px,' + pos.y + 'px)' :
+  				'translate3d(' + pos.x + 'px,' + pos.y + 'px,0)') +
+  			(scale ? ' scale(' + scale + ')' : '');
+      },
+
+      //------------------------------------------------------------------------------
+      _animateZoom: function (e) {
+          var scale = this._map.getZoomScale(e.zoom);
+          // -- different calc of offset in leaflet 1.0.0 and 0.0.7 thanks for 1.0.0-rc2 calc @jduggan1 
+          var offset = window.L.Layer ? this._map._latLngToNewLayerPoint(this._map.getBounds().getNorthWest(), e.zoom, e.center) :
+                                 this._map._getCenterOffset(e.center)._multiplyBy(-scale).subtract(this._map._getMapPanePos());
+
+          window.L.DomUtil.setTransform(this._canvas, offset, scale);
+
+
+      }
+  });
+
+  window.L.canvasLayer = function () {
+      return new window.L.CanvasLayer();
+  };
+
+  function applyDefaultPlot(HeatMap){  
     HeatMap.prototype.defaultPlot = function(row,col,size){
       size = size || this.opts.defaultPlotWidth;
       if(!this.opts.shape_memo || this.opts.shape_memo.size!=size){
@@ -47,51 +217,10 @@
       }
       return this.opts.shape_memo[(row*this.opts.gridSize)+col];
     };
-    
-    HeatMap.prototype.defaultPlot_sort = function(a,b){
-      if(a.blockNumber!=b.blockNumber){
-        return parseFloat(a.blockNumber)>parseFloat(b.blockNumber)?1:-1;
-      }
-      if(a.replicate!=b.replicate){
-        return parseFloat(a.replicate)>parseFloat(b.replicate)?1:-1;
-      }
-      if(a.plotNumber!=b.plotNumber){
-        return parseFloat(a.plotNumber)>parseFloat(b.plotNumber)?1:-1
-      }
-      if(a.plantNumber!=b.plantNumber){
-        return parseFloat(a.plantNumber)>parseFloat(b.plantNumber)?1:-1
-      }
-      return 1;
-    };
   }
-
-  // import turf from "@turf/turf";
-  // 
-  // export default function(HeatMap){
-  //   HeatMap.prototype.setDefaultPlotSize = function(size){ // size is width in km
-  //     this.opts._plotsize = size;
-  //     this.opts.gridHeight = turf.distance(this.opts.defaultPos,turf.along(turf.lineString([this.opts.defaultPos,[this.opts.defaultPos[0],this.opts.defaultPos[1]-1]]),size*this.opts.gridSize),{'units':"degrees"})/this.opts.gridSize;
-  //     this.opts.gridWidth = turf.distance(this.opts.defaultPos,turf.along(turf.lineString([this.opts.defaultPos,[this.opts.defaultPos[0]+1,this.opts.defaultPos[1]]]),size*this.opts.gridSize),{'units':"degrees"})/this.opts.gridSize;
-  //     this.opts.shape_memo = Array(this.opts.gridSize*this.opts.gridSize);
-  //   }
-  // 
-  //   HeatMap.prototype.defaultPlot = function(row,col){
-  //     if(!this.opts.shape_memo[(row*this.opts.gridSize)+col]){
-  //       let top = this.opts.defaultPos[1] - this.opts.gridHeight * (row+1);
-  //       let bottom = this.opts.defaultPos[1] - this.opts.gridHeight * row;
-  //       let left = this.opts.defaultPos[0] + this.opts.gridWidth * col;
-  //       let right = this.opts.defaultPos[0] + this.opts.gridWidth * (col+1);
-  //       this.opts.shape_memo[(row*this.opts.gridSize)+col] = turf.polygon([
-  //         [[left,bottom], [right,bottom], [right,top], [left,top], [left,bottom]]
-  //       ], {});
-  //     }
-  //     return this.opts.shape_memo[(row*this.opts.gridSize)+col];
-  //   }
-  // }
 
   const DEFAULT_OPTS = {
     observationLevel:"plot",
-    trait:null, // 76913 76900 76884 76861
     brapi_auth:null,
     brapi_pageSize:1000,
     defaultPos: [-76.46823640912771,42.44668396825921],
@@ -99,14 +228,16 @@
     defaultPlotWidth: 0.002,
     showNames:true,
     showBlocks:true,
-    showReps:true
+    showReps:true,
+    onClick:()=>{}
   };
 
   const valFormat = d3.format(".2r");
 
   class HeatMap {
     constructor(map_container,brapi_endpoint,studyDbId,opts) {
-      this.map_container = d3.select(map_container);
+      this.map_container = d3.select(map_container)
+        .style("background-color","#888");
       this.brapi_endpoint = brapi_endpoint;
       this.studyDbId = studyDbId;
       
@@ -148,7 +279,6 @@
     }
     
     onDrawLayer(info) {
-      console.log(info);
       var ctx = info.canvas.getContext('2d');
       let map = this.map;
       let transform = d3.geoTransform({point: function(x,y){
@@ -189,7 +319,7 @@
           );
         });
         d.plots.forEach(ou=>{
-          ctx.strokeStyle = "#888";
+          ctx.strokeStyle = "#444";
           ctx.lineWidth = 1;
           ctx.beginPath();
           geoPath(ou.geoJSON);
@@ -374,6 +504,17 @@
       this.canvLayer.drawLayer();
     }
     
+    eachObservationUnit(tId,mutator,reshape){
+      this.data = this.data.then(d=>{
+        d.plots.concat(d.plants).forEach(ou=>mutator(ou));
+        return d;
+      });
+      if(reshape) this.data = this.data.then((d)=>this.shape(d));
+      this.data = this.data.then((d)=>this.parseTraits(d))
+        .then(d=>this.traitColor(d));
+      this.canvLayer.drawLayer();
+    }
+    
     parseTraits(data){
       data.plot_traits = {};
       data.plant_traits = {};
@@ -524,10 +665,10 @@
       
       // Has geoJSON
       data.blocks.forEach(block=>{
-        block.geoJSON = turf.union(...block.values.map(ou=>turf.truncate(ou.geoJSON)));
+        block.geoJSON = turf.union(...block.values.map(ou=>turf.truncate(ou.geoJSON,{'precision':7})));
       });
       data.reps.forEach(rep=>{
-        rep.geoJSON = turf.union(...rep.values.map(ou=>turf.truncate(ou.geoJSON)));
+        rep.geoJSON = turf.union(...rep.values.map(ou=>turf.truncate(ou.geoJSON,{'precision':7})));
       });
       
       if(this.new_data){
@@ -714,7 +855,8 @@
       });
     }
   }
-   defaultPlot(HeatMap);
+
+  applyDefaultPlot(HeatMap);
 
   return HeatMap;
 
