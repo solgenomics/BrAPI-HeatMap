@@ -883,20 +883,26 @@
           }
         }
       }
-      
+      var ou_union = turf.union(
+        ...data.plots.map(ou=>
+          turf.truncate(ou._geoJSON,{'precision':7})
+        )
+      );
       data.blocks.forEach(block=>{
-        block._geoJSON = turf.union(
-          ...block.values.map(ou=>
+        var un = turf.featureCollection(
+          block.values.map(ou=>
             turf.truncate(ou._geoJSON,{'precision':7})
           )
         );
+        block._geoJSON = turf.union(turf.difference(turf.convex(un),ou_union),...un.features);
       });
       data.reps.forEach(rep=>{
-        rep._geoJSON = turf.union(
-          ...rep.values.map(ou=>
+        var un = turf.featureCollection(
+          rep.values.map(ou=>
             turf.truncate(ou._geoJSON,{'precision':7})
           )
         );
+        rep._geoJSON = turf.union(turf.difference(turf.convex(un),ou_union),...un.features);
       });
       
       if(this.new_data){
